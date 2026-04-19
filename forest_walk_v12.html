@@ -1,0 +1,2783 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kadumane — Walking Into the Forest (v11 · Toolkit)</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=Space+Mono:ital@0;1&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#000;cursor:none}
+#c{position:fixed;inset:0;z-index:0;display:block}
+
+/* ── CURSOR ── */
+#cur{position:fixed;width:7px;height:7px;border-radius:50%;pointer-events:none;
+  z-index:9999;transform:translate(-50%,-50%);transition:width .15s,height .15s,background .3s;
+  box-shadow:0 0 8px currentColor}
+#cur2{position:fixed;width:24px;height:24px;border:1px solid rgba(255,255,255,.25);
+  border-radius:50%;pointer-events:none;z-index:9998;transform:translate(-50%,-50%)}
+
+/* ── SCROLL DRIVER ── */
+#scroll-driver{position:fixed;inset:0;z-index:1;overflow-y:scroll;
+  -webkit-overflow-scrolling:touch}
+#scroll-inner{height:9000vh;width:1px}
+
+/* ── HUD DEPTH ── */
+#depth-hud{position:fixed;bottom:2.2rem;left:50%;transform:translateX(-50%);
+  z-index:60;display:flex;flex-direction:column;align-items:center;gap:.5rem;
+  pointer-events:none;transition:opacity .6s}
+.depth-label{font-family:'Space Mono',monospace;font-size:.5rem;
+  letter-spacing:.4em;text-transform:uppercase;color:rgba(255,255,255,.35)}
+.depth-bar{width:160px;height:2px;background:rgba(255,255,255,.1);position:relative}
+.depth-fill{height:100%;background:rgba(255,255,255,.5);width:0%;transition:width .1s}
+.scroll-hint{font-family:'Space Mono',monospace;font-size:.56rem;
+  letter-spacing:.28em;text-transform:uppercase;color:rgba(240,245,220,.7);
+  background:rgba(10,16,8,.55);backdrop-filter:blur(4px);
+  padding:.4rem .8rem;border:1px solid rgba(180,200,140,.15);
+  animation:pulse 2.5s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:.75}50%{opacity:1}}
+
+/* ── ZONE LABEL (fades in when entering a new zone) ── */
+#zone-label{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+  z-index:65;pointer-events:none;text-align:center;
+  opacity:0;transition:opacity 1.2s ease}
+#zone-label.show{opacity:1}
+.zl-pre{font-family:'Space Mono',monospace;font-size:.58rem;
+  letter-spacing:.5em;text-transform:uppercase;color:rgba(200,220,140,.7);
+  margin-bottom:.8rem}
+.zl-name{font-family:'Cormorant Garamond',serif;font-weight:300;
+  font-size:2.8rem;letter-spacing:.1em;color:#f0ead8;line-height:1;
+  text-shadow:0 0 24px rgba(0,0,0,.7)}
+.zl-line{width:80px;height:1px;margin:1rem auto 0;
+  background:linear-gradient(90deg,transparent,rgba(200,220,140,.6),transparent)}
+
+/* ── INTRO OVERLAY ── */
+#intro{position:fixed;inset:0;z-index:200;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  background:rgba(0,0,0,.65);backdrop-filter:blur(2px);
+  transition:opacity 1.8s ease}
+#intro.gone{opacity:0;pointer-events:none}
+#loading{position:fixed;inset:0;z-index:199;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  background:rgba(0,0,0,.92);
+  opacity:0;pointer-events:none;transition:opacity .4s ease}
+#loading.show{opacity:1;pointer-events:all}
+#loading.fade{opacity:0}
+.ld-label{font-family:'Space Mono',monospace;font-size:.55rem;letter-spacing:.45em;
+  text-transform:uppercase;color:rgba(180,200,140,.5);margin-bottom:1.6rem}
+.ld-bar-wrap{width:140px;height:1px;background:rgba(255,255,255,.1)}
+.ld-bar{height:100%;width:0%;background:rgba(180,200,140,.6);transition:width .05s linear}
+.i-pre{font-family:'Space Mono',monospace;font-size:.55rem;letter-spacing:.5em;
+  text-transform:uppercase;color:rgba(220,210,190,.5);margin-bottom:2.5rem;
+  animation:fup 1.2s .3s both}
+.i-title{font-family:'Cormorant Garamond',serif;font-weight:300;
+  font-size:clamp(3rem,8vw,7rem);color:#f0ead8;letter-spacing:.06em;
+  line-height:.95;text-align:center;animation:fup 1.2s .5s both}
+.i-title em{display:block;font-style:italic;font-size:.42em;
+  color:rgba(180,200,140,.7);letter-spacing:.14em;margin-top:.5em}
+.i-line{width:1px;height:55px;
+  background:linear-gradient(rgba(180,200,140,.7),transparent);
+  margin:2.5rem auto;animation:lineG 1s 1.2s both}
+@keyframes lineG{from{height:0;opacity:0}to{height:55px;opacity:1}}
+.i-btn{font-family:'Space Mono',monospace;font-size:.6rem;letter-spacing:.35em;
+  text-transform:uppercase;background:none;
+  border:1px solid rgba(180,200,140,.3);
+  color:rgba(180,200,140,.6);padding:.8rem 2.2rem;
+  cursor:none;transition:all .4s;animation:fup 1s 1.8s both}
+.i-btn:hover{color:#c8d890;border-color:rgba(180,200,140,.6);
+  background:rgba(180,200,140,.06)}
+@keyframes fup{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── NODE LABEL ── */
+#node-tip{position:fixed;pointer-events:none;z-index:70;
+  transform:translate(-50%,-100%);opacity:0;transition:opacity .25s;
+  margin-top:-16px;text-align:center}
+.nt-type{font-family:'Space Mono',monospace;font-size:.48rem;
+  letter-spacing:.3em;text-transform:uppercase;display:block}
+.nt-name{font-family:'Cormorant Garamond',serif;font-size:.95rem;
+  font-style:italic;display:block;color:#f0ead8}
+
+/* ── PANEL ── */
+#panel{position:fixed;top:50%;right:0;transform:translateY(-50%) translateX(100%);
+  width:min(440px,92vw);max-height:82vh;overflow-y:auto;
+  z-index:150;transition:transform .55s cubic-bezier(.16,1,.3,1);
+  scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.1) transparent}
+#panel.open{transform:translateY(-50%) translateX(0)}
+.p-inner{background:rgba(8,12,6,.93);border-left:1px solid rgba(180,200,140,.12);
+  border-top:1px solid rgba(180,200,140,.08);
+  border-bottom:1px solid rgba(180,200,140,.08);
+  backdrop-filter:blur(20px);padding:2.4rem 2rem 2rem;
+  position:relative}
+.p-inner::before{content:'';position:absolute;top:0;left:0;bottom:0;width:3px;
+  background:linear-gradient(to bottom,transparent,rgba(180,200,140,.5),transparent)}
+.p-close{position:absolute;top:1.1rem;right:1.1rem;background:none;
+  border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.3);
+  width:26px;height:26px;cursor:none;font-size:.65rem;
+  display:flex;align-items:center;justify-content:center;transition:all .2s}
+.p-close:hover{color:#fff;border-color:rgba(255,255,255,.4)}
+.p-type-badge{display:inline-flex;align-items:center;gap:.5rem;
+  font-family:'Space Mono',monospace;font-size:.48rem;letter-spacing:.35em;
+  text-transform:uppercase;color:rgba(180,200,140,.6);margin-bottom:.7rem}
+.p-type-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.p-title{font-family:'Cormorant Garamond',serif;font-weight:300;
+  font-size:1.9rem;color:#f0ead8;line-height:1.1;margin-bottom:.4rem}
+.p-plot{font-family:'Space Mono',monospace;font-size:.46rem;
+  letter-spacing:.2em;color:rgba(255,255,255,.25);margin-bottom:1.6rem}
+
+/* note body */
+.note-body{font-family:'Cormorant Garamond',serif;font-size:.95rem;
+  line-height:1.9;color:rgba(240,234,216,.7);font-weight:300}
+.note-body em{color:rgba(180,200,140,.9);font-style:italic}
+.note-body strong{color:rgba(240,234,216,.9);font-style:normal;font-weight:400}
+.ntag{display:inline-block;font-family:'Space Mono',monospace;font-size:.46rem;
+  font-style:italic;padding:.15rem .5rem;margin:.15rem .2rem;
+  border:1px solid rgba(180,200,140,.18);color:rgba(180,200,140,.55);
+  background:rgba(180,200,140,.04)}
+.ntags{margin-bottom:.9rem;margin-top:-.4rem}
+
+/* photo slots */
+.photo-slot{width:100%;aspect-ratio:16/10;background:rgba(20,28,14,.9);
+  border:1px solid rgba(180,200,140,.08);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:.5rem;
+  margin-bottom:.6rem;cursor:none;transition:border-color .3s;position:relative;overflow:hidden}
+.photo-slot:hover{border-color:rgba(180,200,140,.25)}
+.photo-slot-sm{display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:.6rem}
+.photo-slot-sm .photo-slot{aspect-ratio:4/3;margin-bottom:0}
+.ph-icon{font-size:1.8rem;opacity:.15}
+.ph-lbl{font-family:'Space Mono',monospace;font-size:.44rem;
+  letter-spacing:.15em;text-transform:uppercase;color:rgba(180,200,140,.22);
+  text-align:center;padding:0 1rem}
+.ph-upload{font-size:.42rem;color:rgba(255,255,255,.15);
+  font-family:'Space Mono',monospace;letter-spacing:.1em}
+
+/* audio */
+.aud{display:flex;align-items:center;gap:.8rem;padding:.8rem .9rem;
+  background:rgba(15,22,10,.7);border:1px solid rgba(180,200,140,.07);
+  margin-bottom:.45rem;transition:background .25s,border-color .25s;cursor:none}
+.aud:hover{background:rgba(22,32,14,.85);border-color:rgba(180,200,140,.18)}
+.aud-btn{width:30px;height:30px;border-radius:50%;border:1px solid rgba(180,200,140,.25);
+  background:rgba(180,200,140,.05);color:rgba(180,200,140,.7);
+  font-size:.7rem;display:flex;align-items:center;justify-content:center;
+  cursor:none;flex-shrink:0;transition:all .2s}
+.aud-btn:hover{background:rgba(180,200,140,.12)}
+.aud-name{font-family:'Cormorant Garamond',serif;font-size:.88rem;
+  color:rgba(240,234,216,.65);margin-bottom:.18rem}
+.aud-meta{font-family:'Space Mono',monospace;font-size:.44rem;
+  letter-spacing:.08em;color:rgba(255,255,255,.22)}
+.wavebars{display:flex;align-items:center;gap:1.5px;height:20px;flex-shrink:0}
+.wb{width:2px;border-radius:1px;background:rgba(180,200,140,.22);transition:background .2s}
+.aud:hover .wb{background:rgba(180,200,140,.45)}
+
+/* sketch */
+.sketch-frame{width:100%;aspect-ratio:4/3;background:rgba(15,20,10,.8);
+  border:1px solid rgba(180,200,140,.08);display:flex;
+  align-items:center;justify-content:center;margin-bottom:.5rem;
+  position:relative;overflow:hidden}
+.sketch-lbl{font-family:'Space Mono',monospace;font-size:.44rem;
+  letter-spacing:.1em;color:rgba(180,200,140,.28);font-style:italic;text-align:center}
+
+/* data */
+.d-stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;margin-bottom:1.3rem}
+.d-stat{padding:.8rem;background:rgba(15,22,10,.7);border:1px solid rgba(180,200,140,.08);text-align:center}
+.d-stat-n{font-family:'Cormorant Garamond',serif;font-size:1.7rem;font-weight:300;color:#f0ead8;line-height:1}
+.d-stat-l{font-family:'Space Mono',monospace;font-size:.42rem;letter-spacing:.12em;
+  text-transform:uppercase;color:rgba(180,200,140,.3);margin-top:.2rem}
+.d-sec{font-family:'Space Mono',monospace;font-size:.46rem;letter-spacing:.3em;
+  text-transform:uppercase;color:rgba(180,200,140,.4);margin-bottom:.7rem;
+  padding-bottom:.4rem;border-bottom:1px solid rgba(180,200,140,.07)}
+.surv-row{display:flex;align-items:center;gap:.6rem;margin-bottom:.4rem}
+.surv-lbl{font-family:'Space Mono',monospace;font-size:.48rem;
+  font-style:italic;color:rgba(180,200,140,.4);width:52px}
+.surv-track{flex:1;height:3px;background:rgba(255,255,255,.06);overflow:hidden}
+.surv-bar{height:100%;transform-origin:left;
+  animation:grow 1.2s var(--d,0s) ease both;transform:scaleX(0)}
+@keyframes grow{to{transform:scaleX(1)}}
+.surv-pct{font-family:'Space Mono',monospace;font-size:.46rem;
+  color:rgba(255,255,255,.35);width:26px;text-align:right}
+.spectra-wrap{width:100%;height:56px;background:rgba(10,14,8,.9);
+  border:1px solid rgba(180,200,140,.07);margin-bottom:.4rem;overflow:hidden}
+.sp-chips{display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.3rem}
+.sp-chip{font-family:'Space Mono',monospace;font-size:.44rem;font-style:italic;
+  padding:.22rem .55rem;border:1px solid rgba(180,200,140,.1);
+  color:rgba(180,200,140,.35);background:rgba(180,200,140,.02);cursor:none;transition:all .2s}
+.sp-chip:hover{color:rgba(180,200,140,.7);border-color:rgba(180,200,140,.3)}
+
+/* new entry */
+.fld{margin-bottom:.85rem}
+.fld label{display:block;font-family:'Space Mono',monospace;font-size:.44rem;
+  letter-spacing:.25em;text-transform:uppercase;color:rgba(180,200,140,.3);margin-bottom:.3rem}
+.fld input,.fld select,.fld textarea{width:100%;
+  background:rgba(15,22,10,.8);border:1px solid rgba(180,200,140,.1);
+  color:rgba(240,234,216,.75);font-family:'Cormorant Garamond',serif;
+  font-size:.9rem;padding:.55rem .7rem;outline:none;transition:border-color .2s}
+.fld input:focus,.fld select:focus,.fld textarea:focus{border-color:rgba(180,200,140,.3)}
+.fld textarea{min-height:75px;resize:none}
+.fld select option{background:#0d1a09}
+.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:.65rem}
+.up-zone{border:1px dashed rgba(180,200,140,.15);background:rgba(15,22,10,.5);
+  padding:1.1rem;text-align:center;cursor:none;position:relative;transition:all .2s}
+.up-zone:hover{background:rgba(22,32,14,.7);border-color:rgba(180,200,140,.3)}
+.up-zone input{position:absolute;inset:0;opacity:0;width:100%;height:100%}
+.up-icon{font-size:1.1rem;margin-bottom:.25rem;opacity:.5}
+.up-txt{font-family:'Space Mono',monospace;font-size:.44rem;
+  letter-spacing:.15em;text-transform:uppercase;color:rgba(180,200,140,.25)}
+.save-btn{width:100%;background:rgba(180,200,140,.05);
+  border:1px solid rgba(180,200,140,.2);color:rgba(180,200,140,.6);
+  font-family:'Cormorant Garamond',serif;font-size:.95rem;
+  letter-spacing:.08em;padding:.85rem;cursor:none;margin-top:1.1rem;transition:all .3s}
+.save-btn:hover{background:rgba(180,200,140,.1);color:#c8d890;border-color:rgba(180,200,140,.4)}
+
+/* cndd banner */
+.cndd{border:1px solid rgba(180,200,140,.14);border-left:2px solid rgba(180,200,140,.5);
+  padding:.9rem 1.1rem;margin-bottom:1.4rem;background:rgba(180,200,140,.03)}
+.cndd-lbl{font-family:'Space Mono',monospace;font-size:.46rem;
+  letter-spacing:.28em;color:rgba(180,200,140,.55);margin-bottom:.4rem}
+.cndd-body{font-family:'Cormorant Garamond',serif;font-size:.88rem;
+  line-height:1.8;color:rgba(240,234,216,.5);font-style:italic}
+.cndd-body strong{color:rgba(180,200,140,.75);font-style:normal}
+
+/* scrollbar */
+#panel::-webkit-scrollbar{width:3px}
+#panel::-webkit-scrollbar-track{background:transparent}
+#panel::-webkit-scrollbar-thumb{background:rgba(180,200,140,.15);border-radius:2px}
+
+/* click ripple */
+.ripple{position:fixed;pointer-events:none;z-index:160;
+  border-radius:50%;border:1px solid rgba(255,255,255,.35);
+  transform:translate(-50%,-50%);animation:rip .65s ease-out forwards}
+@keyframes rip{to{width:80px;height:80px;opacity:0}}
+
+/* ── TOOLKIT FLIP CARD ── */
+.tk-card{perspective:1400px;width:100%;min-height:280px;cursor:pointer;
+  margin-top:.4rem}
+.tk-inner{position:relative;width:100%;min-height:280px;
+  transition:transform .85s cubic-bezier(.16,1,.3,1);
+  transform-style:preserve-3d}
+.tk-card.flipped .tk-inner{transform:rotateY(180deg)}
+.tk-front,.tk-back{position:absolute;inset:0;
+  backface-visibility:hidden;-webkit-backface-visibility:hidden;
+  display:flex;flex-direction:column;justify-content:center;
+  padding:1.8rem 1.2rem;
+  background:linear-gradient(165deg,rgba(20,28,14,.85),rgba(10,16,8,.92));
+  border:1px solid rgba(180,200,140,.18);
+  border-left:2px solid rgba(180,200,140,.5)}
+.tk-back{transform:rotateY(180deg);
+  background:linear-gradient(165deg,rgba(14,22,10,.92),rgba(8,12,6,.95));
+  border-left:2px solid rgba(200,220,140,.7);
+  justify-content:flex-start;overflow-y:auto}
+.tk-id{font-family:'Space Mono',monospace;font-size:.5rem;
+  letter-spacing:.45em;text-transform:uppercase;
+  color:rgba(180,200,140,.5);margin-bottom:1rem}
+.tk-headline{font-family:'Cormorant Garamond',serif;font-weight:300;
+  font-size:1.55rem;line-height:1.25;color:#f0ead8;
+  font-style:italic}
+.tap-indicator{font-family:'Space Mono',monospace;font-size:.55rem;
+  letter-spacing:.4em;text-transform:uppercase;
+  color:rgba(200,220,140,.75);margin-top:1.8rem;
+  text-align:center;
+  animation:tapPulse 1.4s ease-in-out infinite}
+.tap-indicator span{display:inline-block;
+  animation:tapBob 1.4s ease-in-out infinite}
+@keyframes tapPulse{0%,100%{opacity:.45}50%{opacity:1}}
+@keyframes tapBob{0%,100%{transform:translateY(0)}50%{transform:translateY(3px)}}
+.tk-back-id{font-family:'Space Mono',monospace;font-size:.46rem;
+  letter-spacing:.4em;text-transform:uppercase;
+  color:rgba(200,220,140,.55);margin-bottom:.5rem}
+.tk-back-headline{font-family:'Cormorant Garamond',serif;font-weight:300;
+  font-size:1rem;line-height:1.35;color:rgba(240,234,216,.85);
+  margin-bottom:1rem;padding-bottom:.7rem;
+  border-bottom:1px solid rgba(180,200,140,.15)}
+.tk-back-body{font-family:'Cormorant Garamond',serif;font-size:.92rem;
+  line-height:1.85;color:rgba(240,234,216,.7);font-weight:300}
+.tk-flip-back-btn{font-family:'Space Mono',monospace;font-size:.48rem;
+  letter-spacing:.35em;text-transform:uppercase;
+  color:rgba(180,200,140,.5);margin-top:1.2rem;cursor:pointer;
+  text-align:center;padding:.4rem;
+  border:1px solid rgba(180,200,140,.15);transition:all .25s}
+.tk-flip-back-btn:hover{color:rgba(200,220,140,.9);
+  border-color:rgba(180,200,140,.4)}
+
+/* ── CARD EXTENSIONS: zone badge, insights, source, tags ── */
+.tk-zone-badge{display:inline-block;font-family:'Space Mono',monospace;
+  font-size:.48rem;letter-spacing:.4em;text-transform:uppercase;
+  color:rgba(200,220,140,.7);padding:.3rem .7rem;
+  border:1px solid rgba(180,200,140,.25);
+  background:rgba(180,200,140,.04);
+  margin-bottom:1.2rem;align-self:flex-start}
+.tk-zone-badge-back{margin-bottom:.7rem;font-size:.44rem;letter-spacing:.35em}
+.tk-insights{list-style:none;padding:0;margin:1rem 0 .8rem;
+  border-top:1px solid rgba(180,200,140,.12);padding-top:.8rem}
+.tk-insights li{font-family:'Cormorant Garamond',serif;font-size:.88rem;
+  line-height:1.75;color:rgba(240,234,216,.62);font-weight:300;
+  padding-left:1rem;position:relative;margin-bottom:.55rem}
+.tk-insights li::before{content:'◦';position:absolute;left:0;top:0;
+  color:rgba(200,220,140,.55);font-size:1rem}
+.tk-tags{margin:.8rem 0 .4rem;display:flex;flex-wrap:wrap;gap:.3rem}
+.tk-tag{display:inline-block;font-family:'Space Mono',monospace;
+  font-size:.44rem;font-style:italic;padding:.18rem .55rem;
+  border:1px solid rgba(180,200,140,.15);color:rgba(180,200,140,.45);
+  background:rgba(180,200,140,.03);letter-spacing:.05em}
+.tk-source{margin-top:.9rem;padding-top:.7rem;
+  border-top:1px solid rgba(180,200,140,.12);
+  font-family:'Cormorant Garamond',serif;font-size:.82rem;
+  font-style:italic;color:rgba(240,234,216,.55)}
+/* ── CREDITS BUTTON & MODAL ── */
+#credits-btn{position:fixed;top:1.4rem;right:1.5rem;z-index:180;
+  font-family:'Space Mono',monospace;font-size:.5rem;letter-spacing:.4em;
+  text-transform:uppercase;color:rgba(200,220,140,.55);
+  background:rgba(10,16,8,.55);backdrop-filter:blur(6px);
+  border:1px solid rgba(180,200,140,.18);
+  padding:.6rem 1.1rem;cursor:none;transition:all .3s}
+#credits-btn:hover{color:#c8d890;border-color:rgba(180,200,140,.45);
+  background:rgba(20,32,14,.75)}
+#credits-modal{position:fixed;inset:0;z-index:300;
+  background:rgba(0,0,0,.82);backdrop-filter:blur(8px);
+  display:none;align-items:center;justify-content:center;
+  opacity:0;transition:opacity .4s ease}
+#credits-modal.open{display:flex;opacity:1}
+.cr-inner{width:min(720px,92vw);max-height:86vh;overflow-y:auto;
+  background:rgba(8,12,6,.95);border:1px solid rgba(180,200,140,.15);
+  border-left:3px solid rgba(180,200,140,.5);
+  padding:2.8rem 2.6rem 2.4rem;position:relative;
+  scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.15) transparent}
+.cr-inner::-webkit-scrollbar{width:4px}
+.cr-inner::-webkit-scrollbar-track{background:transparent}
+.cr-inner::-webkit-scrollbar-thumb{background:rgba(180,200,140,.2)}
+.cr-close{position:absolute;top:1.1rem;right:1.2rem;background:none;
+  border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.4);
+  width:28px;height:28px;cursor:none;font-size:.7rem;
+  display:flex;align-items:center;justify-content:center;transition:all .2s}
+.cr-close:hover{color:#fff;border-color:rgba(255,255,255,.5)}
+.cr-heading{font-family:'Cormorant Garamond',serif;font-weight:300;
+  font-size:2rem;color:#f0ead8;letter-spacing:.04em;
+  margin-bottom:.4rem;line-height:1.1}
+.cr-sub{font-family:'Space Mono',monospace;font-size:.52rem;
+  letter-spacing:.4em;text-transform:uppercase;
+  color:rgba(200,220,140,.55);margin-bottom:2rem}
+.cr-section{margin-bottom:1.8rem}
+.cr-section-title{font-family:'Space Mono',monospace;font-size:.54rem;
+  letter-spacing:.38em;text-transform:uppercase;
+  color:rgba(200,220,140,.75);margin-bottom:.85rem;
+  padding-bottom:.45rem;border-bottom:1px solid rgba(180,200,140,.15)}
+.cr-role{font-family:'Space Mono',monospace;font-size:.48rem;
+  letter-spacing:.3em;text-transform:uppercase;
+  color:rgba(180,200,140,.5);margin:.9rem 0 .35rem}
+.cr-names{font-family:'Cormorant Garamond',serif;font-size:.95rem;
+  line-height:1.85;color:rgba(240,234,216,.78);font-weight:300}
+.cr-names span{display:inline-block;margin-right:.8rem}
+.cr-names span:not(:last-child)::after{content:'·';margin-left:.8rem;
+  color:rgba(180,200,140,.4)}
+.cr-biblio{font-family:'Cormorant Garamond',serif;font-size:.84rem;
+  line-height:1.7;color:rgba(240,234,216,.6);font-weight:300}
+.cr-biblio-item{margin-bottom:.85rem;padding-left:.9rem;
+  border-left:1px solid rgba(180,200,140,.12)}
+.cr-biblio-item em{color:rgba(200,220,140,.75);font-style:italic}
+.cr-biblio-note{display:block;font-size:.72rem;font-style:italic;
+  color:rgba(180,200,140,.5);margin-top:.2rem}
+.cr-biblio-sub{font-family:'Space Mono',monospace;font-size:.48rem;
+  letter-spacing:.3em;text-transform:uppercase;
+  color:rgba(200,220,140,.55);margin:1rem 0 .5rem}
+</style>
+</head>
+<body>
+
+<div id="cur"></div>
+<div id="cur2"></div>
+<canvas id="c"></canvas>
+
+<button id="credits-btn" onclick="openCredits()">Credits &amp; Bibliography</button>
+
+<div id="credits-modal">
+  <div class="cr-inner">
+    <button class="cr-close" onclick="closeCredits()">✕</button>
+    <div class="cr-heading">Walk Into a Fragmented Forest</div>
+    <div class="cr-sub">Credits &amp; Bibliography</div>
+
+    <div class="cr-section">
+      <div class="cr-section-title">NCBS Research Team</div>
+
+      <div class="cr-role">Principal Scientist</div>
+      <div class="cr-names"><span>Meghna Krishnadas</span></div>
+
+      <div class="cr-role">Post Doctoral Researchers</div>
+      <div class="cr-names">
+        <span>Ishrat Shaheen</span><span>Rohit Sasidharan</span><span>Vincy K Wilson</span>
+      </div>
+
+      <div class="cr-role">PhD Scholars</div>
+      <div class="cr-names">
+        <span>Rishiddh Jhaveri</span><span>Vinayak Saini</span><span>Shubham</span><span>Sumashini</span><span>Sarbari</span><span>Dhrubo</span><span>Saikat</span>
+      </div>
+
+      <div class="cr-role">Integrated PhD Scholars</div>
+      <div class="cr-names"><span>Anamitra Biswas</span></div>
+
+      <div class="cr-role">Project Assistants</div>
+      <div class="cr-names">
+        <span>Anand Meharwade</span><span>Aparna Lalit Mishra</span><span>Athulya</span><span>Gayathri</span><span>Radhika Rajendra</span><span>Varsha</span>
+      </div>
+
+      <div class="cr-role">Field Research Assistants</div>
+      <div class="cr-names"><span>Ebinesh</span><span>Arul</span><span>Ashok</span></div>
+
+      <div class="cr-role">Master's Students</div>
+      <div class="cr-names"><span>Aravindhan KP</span><span>Sheethal</span><span>Sruthi</span></div>
+    </div>
+
+    <div class="cr-section">
+      <div class="cr-section-title">Production Assistants · HereNow Studio</div>
+      <div class="cr-names">
+        <span>Sumedha Neyogi</span><span>Vishal Neyogi</span><span>Shyamanth S Kashyap</span>
+      </div>
+    </div>
+
+    <div class="cr-section">
+      <div class="cr-section-title">Bibliography</div>
+
+      <div class="cr-biblio-sub">Ecology, Biodiversity &amp; Pathogen Regulation</div>
+      <div class="cr-biblio">
+        <div class="cr-biblio-item">Levi, T., Barfield, M., Barrantes, S., Sullivan, C., Holt, R. D., &amp; Terborgh, J. (2019). Tropical forests can maintain hyperdiversity because of enemies. <em>Proceedings of the National Academy of Sciences (PNAS)</em>, 116(2), 581–586.<span class="cr-biblio-note">Core source for: 200 Billion Deaths, The Exclusion Zone, The Paradox of Rarity</span></div>
+        <div class="cr-biblio-item">Sedio, B. E., &amp; Ostling, A. M. (2013). How specialised must natural enemies be to facilitate coexistence among plants? <em>Ecology Letters</em>, 16(8), 995–1003.<span class="cr-biblio-note">Core source for: Defence Space, Chemical Shields, Generalist vs. Specialist Pests</span></div>
+        <div class="cr-biblio-item">Janzen, D. H. (1970). Herbivores and the number of tree species in tropical forests. <em>The American Naturalist</em>, 104(940), 501–528.<span class="cr-biblio-note">Foundational text: the original Janzen-Connell Hypothesis</span></div>
+        <div class="cr-biblio-item">Connell, J. H. (1971). On the role of natural enemies in preventing competitive exclusion in some marine animals and in rain forest trees. <em>Dynamics of Populations</em>, 298–312.<span class="cr-biblio-note">Foundational text: the original Janzen-Connell Hypothesis</span></div>
+        <div class="cr-biblio-item">Yale School of the Environment. (n.d.). 'Cryptic' Interactions Drive Biodiversity Decline Near the Edge of Forest Fragments.</div>
+        <div class="cr-biblio-item">Mongabay India. (2018). Tussles between plants and their enemies drive forest fragment diversity.</div>
+        <div class="cr-biblio-item">Comita, L. S., et al. (2014). Testing predictions of the Janzen-Connell hypothesis: a meta-analysis of experimental evidence for distance- and density-dependent seed and seedling survival. <em>Journal of Ecology</em>, 102, 845–856.</div>
+      </div>
+
+      <div class="cr-biblio-sub">Chemical Communication &amp; Information Theory</div>
+      <div class="cr-biblio">
+        <div class="cr-biblio-item">Zu, P.-J., García-García, R., Schuman, M. C., Saavedra, S., &amp; Melián, C. J. (2023). Plant–insect chemical communication in ecological communities: an information theory perspective. <em>Journal of Systematics and Evolution</em>, 61(3).<span class="cr-biblio-note">Core source for: Information Arms Race, Zipf's Law in plant chemistry, Signal Rarity</span></div>
+        <div class="cr-biblio-item">Zipf, G. K. (1949). <em>Human Behavior and the Principle of Least Effort</em>. Cambridge: Addison-Wesley Press.<span class="cr-biblio-note">Foundational text: the mathematical law used to model the distribution of chemical signals</span></div>
+      </div>
+
+      <div class="cr-biblio-sub">Biosemiotics, Phenomenology &amp; Dark Ecology</div>
+      <div class="cr-biblio">
+        <div class="cr-biblio-item">Brier, S. (2008). The Paradigm of Peircean Biosemiotics. <em>Signs</em>, 2, 20–81.<span class="cr-biblio-note">Core source for: plants as sign-users, phytosemiotics, communication without a brain</span></div>
+        <div class="cr-biblio-item">von Uexküll, J. (1934). <em>A Stroll through the Worlds of Animals and Men: A Picture Book of Invisible Worlds</em>.<span class="cr-biblio-note">Foundational text: the concept of the Umwelt and species-specific realities</span></div>
+        <div class="cr-biblio-item">Morton, T. (2013). <em>Hyperobjects: Philosophy and Ecology after the End of the World</em>. University of Minnesota Press.<span class="cr-biblio-note">Foundational text: framing habitat fragmentation as a Hyperobject</span></div>
+        <div class="cr-biblio-item">Morton, T. (2016). <em>Dark Ecology: For a Logic of Future Coexistence</em>. Columbia University Press.<span class="cr-biblio-note">Foundational text: complicity and being "inside" the disaster rather than observing it</span></div>
+      </div>
+
+      <div class="cr-biblio-sub">Primary Field Data &amp; Methodological Sources</div>
+      <div class="cr-biblio">
+        <div class="cr-biblio-item">Krishnadas, M., et al. (2018). Effects of forest fragment area on interactions between plants and their natural enemies: consequences for plant diversity at multiple spatial scales.</div>
+        <div class="cr-biblio-item">Krishnadas Lab. (n.d.). Kadamane Seedling Dynamics Research. GK Lab.</div>
+        <div class="cr-biblio-item">National Centre for Biological Sciences (NCBS) Field Research (2026). Unpublished field recordings, morphological traits, and spatial census datasets from Kadamane Tea Estate, Western Ghats.</div>
+        <div class="cr-biblio-item">HereNow Studio (2026). Walk Into a Fragmented Forest: Conceptual and Generative System Brief. <em>Abhishek Kapahi &amp; Shreni Sanghvi</em>.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- scroll driver — no visible content, just drives depth -->
+<div id="scroll-driver"><div id="scroll-inner"></div></div>
+
+<!-- INTRO -->
+<div id="intro">
+  <div class="i-pre">Western Ghats · Kadumane Estate · Karnataka</div>
+  <h1 class="i-title">Field Notes<em>walking into the forest</em></h1>
+  <div class="i-line"></div>
+  <button class="i-btn" onclick="startWalk()">Begin</button>
+</div>
+
+<div id="loading">
+  <div class="ld-label">entering forest</div>
+  <div class="ld-bar-wrap"><div class="ld-bar" id="ld-bar"></div></div>
+</div>
+
+<!-- DEPTH HUD -->
+<div id="depth-hud">
+  <div class="depth-label">depth into forest</div>
+  <div class="depth-bar"><div class="depth-fill" id="depth-fill"></div></div>
+  <div class="scroll-hint" id="scroll-hint">W/S · forward/back &nbsp;·&nbsp; A/D · left/right &nbsp;·&nbsp; SPACE · rise</div>
+</div>
+
+<!-- ZONE LABEL (shows when entering a new zone) -->
+<div id="zone-label">
+  <div class="zl-pre" id="zl-pre">entering</div>
+  <div class="zl-name" id="zl-name"></div>
+  <div class="zl-line"></div>
+</div>
+
+<!-- NODE TIP -->
+<div id="node-tip">
+  <span class="nt-type" id="nt-type"></span>
+  <span class="nt-name" id="nt-name"></span>
+</div>
+
+<!-- PANEL -->
+<div id="panel">
+  <div class="p-inner" id="p-inner">
+    <button class="p-close" onclick="closePanel()">✕</button>
+    <div class="p-type-badge" id="p-badge">
+      <div class="p-type-dot" id="p-dot"></div>
+      <span id="p-type-txt"></span>
+    </div>
+    <div class="p-title" id="p-title"></div>
+    <div class="p-plot" id="p-plot"></div>
+    <div id="p-body"></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ═══════════════════════════════════════════════
+// CONFIG — single source of truth for tuning
+// ═══════════════════════════════════════════════
+const CONFIG = {
+  // Forest playable boundary (circular, invisible, soft inward push only)
+  boundary: {
+    centerX: 0,
+    centerZ: -60,      // shifted deeper to accommodate larger radius
+    radius: 100,       // doubled — ~200 unit diameter
+    bounceK: 0.025     // soft inward push per overshoot unit
+  },
+  // Toolkit
+  toolkit: {
+    count: 40,
+    minSpacing: 7,     // spacing between cards (reduced since cards now cluster)
+    placementSeed: 42,
+    edgeMargin: 6,
+    startMargin: 10
+  },
+  // Movement / camera
+  move: {
+    velStopEps: 0.002,    // below this velocity, snap to zero (kills jitter)
+    camLerp: 0.05,        // softer camera follow
+    detectR: 2.6,         // card auto-open detection radius
+    depthDivisor: 160     // depth bar fills half as fast
+  }
+};
+
+// ── Seeded PRNG (Mulberry32) — used for toolkit placement only ──
+function mulberry32(seed){
+  let s = seed >>> 0;
+  return function(){
+    s = (s + 0x6D2B79F5) >>> 0;
+    let t = s;
+    t = Math.imul(t ^ t >>> 15, t | 1);
+    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+const seedRnd = mulberry32(CONFIG.toolkit.placementSeed);
+function srnd(a,b){return a+(b-a)*seedRnd();}
+
+// ═══════════════════════════════════════════════
+// GLOBALS
+// ═══════════════════════════════════════════════
+const W=()=>window.innerWidth, H=()=>window.innerHeight;
+let appStarted=false;
+const CAM_START=18;
+const TILE_SIZE=80;
+let totalWalked=0;
+let dfFixed=0;
+
+// ── INSECT STATE ──
+let insZ=CAM_START;
+let insX=0, insY=2.0;
+let insVX=0, insVY=0, insVZ=0;  // velocity
+let insBobPhase=0;               // wing-beat phase
+let insHeading=0;                // yaw (faces forward by default)
+let insAtNode=null;
+let insNodeHoverT=0;
+// Cooldown map: card id -> frame number when it was last auto-opened.
+// Proximity check skips a card while its cooldown is active.
+// This prevents the bug from re-latching to a card it just left (previously
+// caused "card keeps re-opening" loops because the magnet/release cycle kept
+// the bug inside detection radius).
+const nodeCooldown=new Map();
+const NODE_COOLDOWN_FRAMES=360; // 6 seconds at 60fps
+
+// ── KEY INPUT ──
+const keys={};
+document.addEventListener('keydown',e=>{
+  keys[e.code]=true;
+  if(e.code==='Space') e.preventDefault();
+});
+document.addEventListener('keyup',e=>{ keys[e.code]=false; });
+
+// ── Hoisted scene-object refs (assigned inside buildScene, used in animate) ──
+let godRays=[], dappleMat, dustMat, dustPhase, dust, dapples, sporeMat, spores;
+let waterMesh, waterOrigY, waterVertCount, shimMesh, shim2Mesh;
+let flowPoints, flowCount, flowPhase, flowMat, rippleMat;
+let tileMeshes, builtTiles, lastTileIdx;
+let nodeMeshes=[], nodeObjects=[];
+let raycaster, mouse2, hoveredNode=null;
+const nodeTip=document.getElementById('node-tip');
+
+// ═══════════════════════════════════════════════
+// CURSOR
+// ═══════════════════════════════════════════════
+const curEl=document.getElementById('cur');
+const cur2El=document.getElementById('cur2');
+let mx=W()/2, my=H()/2, rx=mx, ry=my;
+document.addEventListener('mousemove',e=>{
+  mx=e.clientX; my=e.clientY;
+  // Inner dot: instant, no lag
+  curEl.style.left=mx+'px'; curEl.style.top=my+'px';
+});
+// Outer ring lerp runs inside the main animate() loop — no separate rAF
+
+document.addEventListener('click',e=>{
+  const r=document.createElement('div');
+  r.className='ripple';
+  r.style.left=e.clientX+'px'; r.style.top=e.clientY+'px';
+  document.body.appendChild(r);
+  setTimeout(()=>r.remove(),700);
+});
+
+// ═══════════════════════════════════════════════
+// THREE SETUP
+// ═══════════════════════════════════════════════
+const renderer=new THREE.WebGLRenderer({canvas:document.getElementById('c'),antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(W(),H());
+renderer.shadowMap.enabled=true;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1.1;
+
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x87ceaa);
+scene.fog=new THREE.FogExp2(0x6a9e78, 0.028);
+
+const camera=new THREE.PerspectiveCamera(62, W()/H(), .1, 200);
+camera.position.set(0, 1.85, CAM_START);
+camera.lookAt(0,1.6,0);
+
+// ── SKY GRADIENT (background changes with depth) ──
+// We update scene.background in the loop based on scrollT
+
+// ── LIGHTING ── changes with depth (bright at edge, dark deep)
+const sunLight=new THREE.DirectionalLight(0xfff2d0, 2.2);
+sunLight.position.set(8,20,10);
+sunLight.castShadow=true;
+sunLight.shadow.mapSize.set(2048,2048);
+sunLight.shadow.camera.near=0.1; sunLight.shadow.camera.far=120;
+sunLight.shadow.camera.left=-40; sunLight.shadow.camera.right=40;
+sunLight.shadow.camera.top=20; sunLight.shadow.camera.bottom=-10;
+sunLight.shadow.bias=-0.002;
+scene.add(sunLight);
+
+const skyLight=new THREE.HemisphereLight(0x90d4a0, 0x3a5c2a, 1.0);
+scene.add(skyLight);
+
+const ambLight=new THREE.AmbientLight(0x4a6e4a, 0.5);
+scene.add(ambLight);
+
+// ═══════════════════════════════════════════════
+// INSECT MESH — a small dragonfly-like creature
+// Body: elongated cylinder, Wings: 4 flat planes
+// ═══════════════════════════════════════════════
+const insectGroup=new THREE.Group();
+
+// Thorax
+const thoraxGeo=new THREE.SphereGeometry(0.055,8,6);
+thoraxGeo.scale(1,1,1.4);
+const thoraxMesh=new THREE.Mesh(thoraxGeo,
+  new THREE.MeshLambertMaterial({color:0x2a4a2a}));
+insectGroup.add(thoraxMesh);
+
+// Abdomen — segmented tapered cylinder pointing backward
+const abdGeo=new THREE.CylinderGeometry(0.018,0.035,0.38,8,4);
+const abdMesh=new THREE.Mesh(abdGeo,
+  new THREE.MeshLambertMaterial({color:0x1a3a1a}));
+abdMesh.rotation.x=Math.PI/2;
+abdMesh.position.z=0.22;
+insectGroup.add(abdMesh);
+
+// Head — small sphere
+const headGeo=new THREE.SphereGeometry(0.038,7,6);
+const headMesh=new THREE.Mesh(headGeo,
+  new THREE.MeshLambertMaterial({color:0x3a5a2a}));
+headMesh.position.z=-0.08;
+insectGroup.add(headMesh);
+
+// Eyes — two tiny spheres
+[-1,1].forEach(side=>{
+  const eyeGeo=new THREE.SphereGeometry(0.018,5,4);
+  const eyeMesh=new THREE.Mesh(eyeGeo,
+    new THREE.MeshLambertMaterial({color:0x88cccc}));
+  eyeMesh.position.set(side*0.032,0.018,-0.1);
+  insectGroup.add(eyeMesh);
+});
+
+// Wings — 4 translucent planes (fore + hind pair)
+const wingMat=new THREE.MeshLambertMaterial({
+  color:0xaaddcc, transparent:true, opacity:0.35,
+  side:THREE.DoubleSide, depthWrite:false});
+[
+  {x:-0.22,y:0.01,z:-0.02, rx:-0.1,rz: 0.28, sx:1,  sy:1},  // left fore
+  {x: 0.22,y:0.01,z:-0.02, rx:-0.1,rz:-0.28, sx:1,  sy:1},  // right fore
+  {x:-0.16,y:0.01,z: 0.08, rx: 0.1,rz: 0.22, sx:.8, sy:.8}, // left hind
+  {x: 0.16,y:0.01,z: 0.08, rx: 0.1,rz:-0.22, sx:.8, sy:.8}, // right hind
+].forEach(w=>{
+  const wg=new THREE.PlaneGeometry(0.28*w.sx, 0.10*w.sy);
+  const wm=new THREE.Mesh(wg,wingMat);
+  wm.position.set(w.x,w.y,w.z);
+  wm.rotation.set(w.rx,0,w.rz);
+  insectGroup.add(wm);
+});
+
+// Small point light so insect glows faintly — helps it read in shadow
+const insLight=new THREE.PointLight(0x88ffcc, 0.6, 3.5);
+insectGroup.add(insLight);
+
+insectGroup.position.set(0, 2.0, CAM_START);
+scene.add(insectGroup);
+
+// ── GROUND ──
+const groundGeo=new THREE.PlaneGeometry(200,200,80,80);
+const gp=groundGeo.attributes.position;
+for(let i=0;i<gp.count;i++){
+  const x=gp.getX(i), z=gp.getZ(i);
+  gp.setY(i, Math.sin(x*.25)*Math.cos(z*.3)*.12 + (Math.random()-.5)*.06);
+}
+groundGeo.computeVertexNormals();
+const groundMat=new THREE.MeshLambertMaterial({color:0x2d4a1e});
+const ground=new THREE.Mesh(groundGeo,groundMat);
+ground.rotation.x=-Math.PI/2;
+ground.receiveShadow=true;
+scene.add(ground);
+
+// Ground litter patches
+for(let i=0;i<200;i++){
+  const lg=new THREE.PlaneGeometry(.3+Math.random()*.7,.3+Math.random()*.7);
+  const lm=new THREE.MeshLambertMaterial({
+    color:new THREE.Color(.12+Math.random()*.08,.18+Math.random()*.1,.04+Math.random()*.04),
+    side:THREE.DoubleSide});
+  const lf=new THREE.Mesh(lg,lm);
+  lf.rotation.x=-Math.PI/2+(Math.random()-.5)*.3;
+  lf.rotation.z=Math.random()*Math.PI*2;
+  lf.position.set((Math.random()-.5)*50,.01,(Math.random())*-80);
+  scene.add(lf);
+}
+
+// ─────────────────────────────────────────────
+// TREE FACTORY
+// ─────────────────────────────────────────────
+function rnd(a,b){return a+(b-a)*Math.random();}
+
+// Canopy density function: at z=18 (edge) → sparse; at z=-62 (deep) → dense
+// z range: +18 to -62 = 80 units
+function depthFactor(z){ return Math.max(0,Math.min(1,(-z+18)/128)); }
+
+// Global trunk registry — collision and occlusion queries iterate this array.
+// Populated by makeTree() as trees are built.
+const ALL_TRUNKS = [];
+
+function makeTree(x,z,opts={}){
+  const g=new THREE.Group();
+  const h=opts.h||rnd(7,14);
+  const r=opts.r||rnd(0.9,2.0);
+  const df=depthFactor(z);
+
+  // trunk
+  const tGeo=new THREE.CylinderGeometry(r*.28,r*.55,h,7,6,false);
+  const tPos=tGeo.attributes.position;
+  for(let i=0;i<tPos.count;i++){
+    const y=tPos.getY(i);
+    const t=(y+h/2)/h;
+    tPos.setX(i,tPos.getX(i)+(Math.random()-.5)*.08*h*t);
+    tPos.setZ(i,tPos.getZ(i)+(Math.random()-.5)*.06*h*t);
+  }
+  tGeo.computeVertexNormals();
+  // Bark color: lighter at edge, darker deep
+  const barkL=.08-df*.05;
+  const trunkMat=new THREE.MeshLambertMaterial({
+    color:new THREE.Color(barkL+.04,barkL+.02,barkL)});
+  const trunk=new THREE.Mesh(tGeo,trunkMat);
+  trunk.position.y=h/2;
+  trunk.castShadow=true; trunk.receiveShadow=true;
+  g.add(trunk);
+
+  // canopy layers - deeper = more layers, denser, darker
+  const numLayers=Math.round(2+df*4);
+  const canopyBase=new THREE.Color(
+    .04+df*.01+Math.random()*.02,
+    .10+df*.02+Math.random()*.04,
+    .02+Math.random()*.02);
+
+  for(let i=0;i<numLayers;i++){
+    const frac=i/(numLayers-1||1);
+    const ly=h*.6+frac*h*.45;
+    const lr=r*(1.1-frac*.3)+Math.random()*.4;
+    const cGeo=new THREE.SphereGeometry(lr,8,6);
+    const cP=cGeo.attributes.position;
+    for(let j=0;j<cP.count;j++){
+      const nx=cP.getX(j),ny=cP.getY(j),nz=cP.getZ(j);
+      const len=Math.sqrt(nx*nx+ny*ny+nz*nz)||1;
+      cP.setXYZ(j,nx/len*len*(1+(Math.random()-.5)*.35),
+                  ny/len*len*(1+(Math.random()-.5)*.25),
+                  nz/len*len*(1+(Math.random()-.5)*.35));
+    }
+    cGeo.computeVertexNormals();
+    // Canopy: at edge sunlit bright green, deep = dark
+    const lightFactor=1-df*.6;
+    const cColor=canopyBase.clone().multiplyScalar(.5+lightFactor*.8);
+    const cMat=new THREE.MeshLambertMaterial({color:cColor,transparent:true,opacity:.9+df*.08});
+    const cap=new THREE.Mesh(cGeo,cMat);
+    cap.position.set((Math.random()-.5)*r*.5,ly,(Math.random()-.5)*r*.5);
+    cap.castShadow=true;
+    g.add(cap);
+  }
+
+  // buttress roots
+  const numRoots=Math.round(3+df*2);
+  for(let i=0;i<numRoots;i++){
+    const ang=i/numRoots*Math.PI*2+Math.random()*.4;
+    const rGeo=new THREE.CylinderGeometry(.025,.2,.7+df*.3,4,1);
+    const rMat=new THREE.MeshLambertMaterial({color:new THREE.Color(.05,.03,.01)});
+    const root=new THREE.Mesh(rGeo,rMat);
+    root.position.set(Math.cos(ang)*r*.5,.12,Math.sin(ang)*r*.5);
+    root.rotation.z=Math.cos(ang)*.4;
+    root.rotation.x=Math.sin(ang)*.4;
+    g.add(root);
+  }
+
+  g.position.set(x,0,z);
+  g.rotation.y=Math.random()*Math.PI*2;
+  scene.add(g);
+
+  // Register this trunk for collision + occlusion checks
+  ALL_TRUNKS.push({
+    x: x, z: z,
+    r: r * 0.55,          // base radius (bottom of trunk cone)
+    h: h,
+    group: g,
+    trunkMat: trunkMat,
+    origTrunkOpacity: 1.0,
+    targetOpacity: 1.0
+  });
+  // Make trunk material fade-capable
+  trunkMat.transparent = true;
+
+  return g;
+}
+
+// Global trunk registry — defined BEFORE any makeTree calls (hoisted)
+// (declaration lives below; this comment marks where we start using it)
+// ── Constants used both in buildScene and animate/openPanel ──
+const STREAM_Z=-62;
+const STREAM_W=22;
+const TYPE_COLORS={
+  observation:'#c8d890',
+  photo:'#e8c87a',
+  audio:'#90c8d8',
+  sketch:'#d8a090',
+  data:'#a090d8',
+  entry:'#90d8b0'
+};
+const TYPE_LABELS={
+  observation:'Field Note',
+  photo:'Photograph',
+  audio:'Audio Recording',
+  sketch:'Sketch',
+  data:'Data Record',
+  entry:'New Entry'
+};
+
+function expandLS(axiom,rules,gen){
+  let s=axiom;
+  for(let g=0;g<gen;g++){let ns='';for(const c of s)ns+=(rules[c]||c);s=ns;}
+  return s;
+}
+function mergeGeos(geos, matrices){
+  let totalVerts=0, totalIdx=0;
+  for(const g of geos){
+    totalVerts+=g.attributes.position.count;
+    if(g.index) totalIdx+=g.index.count;
+  }
+  const pos=new Float32Array(totalVerts*3);
+  const nor=new Float32Array(totalVerts*3);
+  const idx=totalIdx>0?new Uint32Array(totalIdx):null;
+  let vOff=0,iOff=0;
+  const tmpV=new THREE.Vector3(), tmpN=new THREE.Vector3();
+  for(let gi=0;gi<geos.length;gi++){
+    const g=geos[gi]; const m=matrices[gi];
+    const mn=new THREE.Matrix3().getNormalMatrix(m);
+    const pa=g.attributes.position, na=g.attributes.normal;
+    for(let i=0;i<pa.count;i++){
+      tmpV.set(pa.getX(i),pa.getY(i),pa.getZ(i)).applyMatrix4(m);
+      pos[(vOff+i)*3]=tmpV.x; pos[(vOff+i)*3+1]=tmpV.y; pos[(vOff+i)*3+2]=tmpV.z;
+      if(na){
+        tmpN.set(na.getX(i),na.getY(i),na.getZ(i)).applyMatrix3(mn).normalize();
+        nor[(vOff+i)*3]=tmpN.x; nor[(vOff+i)*3+1]=tmpN.y; nor[(vOff+i)*3+2]=tmpN.z;
+      }
+    }
+    if(idx && g.index){
+      const ia=g.index;
+      for(let i=0;i<ia.count;i++) idx[iOff+i]=ia.getX(i)+vOff;
+      iOff+=ia.count;
+    }
+    vOff+=pa.count;
+  }
+  const out=new THREE.BufferGeometry();
+  out.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  out.setAttribute('normal',new THREE.BufferAttribute(nor,3));
+  if(idx) out.setIndex(new THREE.BufferAttribute(idx,1));
+  return out;
+}
+function makeLSapling(totalH, df){
+  const lsv=LS_RULES[Math.floor(Math.random()*LS_RULES.length)];
+  const str=expandLS(lsv.axiom,lsv.rules,lsv.gen);
+  const fCount=(str.match(/F/g)||[]).length||1;
+  const segLen=Math.min(totalH/Math.max(fCount*.18,3), totalH*.28);
+  const baseR=Math.max(totalH*.018, .006);
+  const ang=lsv.angle*(Math.PI/180);
+
+  const barkGeos=[], barkMats=[];
+  const leafGeos=[], leafMats2=[];
+
+  const stack=[];
+  let pos=new THREE.Vector3(0,0,0);
+  let pitch=0, yaw=0, depth=0;
+
+  function pushBranch(from,to,radius){
+    const dir=to.clone().sub(from); const len=dir.length();
+    if(len<.001)return;
+    const cg=new THREE.CylinderGeometry(Math.max(radius*.6,.003),Math.max(radius,.004),len,5,1);
+    // Build matrix: translate to midpoint, rotate to align with dir
+    const mid=from.clone().add(to).multiplyScalar(.5);
+    const m=new THREE.Matrix4();
+    const q=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),dir.normalize());
+    m.compose(mid, q, new THREE.Vector3(1,1,1));
+    barkGeos.push(cg); barkMats.push(m);
+  }
+  function pushLeaves(p, radius){
+    // 2-4 flat planes per tip — much fewer than before
+    const n=Math.floor(rnd(2,5));
+    for(let i=0;i<n;i++){
+      const ls=rnd(.05,.18)*(1+radius*6);
+      const lg=new THREE.PlaneGeometry(ls,ls*.65);
+      const spread=radius*5+.05;
+      const lp=p.clone().add(new THREE.Vector3(
+        (Math.random()-.5)*spread, (Math.random()-.5)*spread*.5, (Math.random()-.5)*spread));
+      const m=new THREE.Matrix4();
+      const q=new THREE.Euler(Math.random()*Math.PI,Math.random()*Math.PI,Math.random()*Math.PI);
+      m.makeRotationFromEuler(q); m.setPosition(lp);
+      leafGeos.push(lg); leafMats2.push(m);
+    }
+  }
+
+  for(const c of str){
+    if(c==='F'){
+      // depth=0 = main trunk: always straight up (ignore all pitch/yaw)
+      let dir;
+      if(depth===0){
+        dir=new THREE.Vector3(0,1,0);
+      } else {
+        dir=new THREE.Vector3(
+          Math.sin(yaw)*Math.cos(pitch), Math.cos(pitch), Math.cos(yaw)*Math.cos(pitch)
+        ).normalize();
+      }
+      const r=Math.max(baseR*Math.pow(.68,depth),.004);
+      const np=pos.clone().add(dir.clone().multiplyScalar(segLen));
+      pushBranch(pos,np,r); pos=np;
+    }else if(c==='+'){if(depth>0) pitch+=ang*(1+(Math.random()-.5)*.2);
+    }else if(c==='-'){if(depth>0) pitch-=ang*(1+(Math.random()-.5)*.2);
+    }else if(c==='['){
+      stack.push({pos:pos.clone(),pitch,yaw,depth}); depth++;
+      // Branch: clear outward pitch (80-90° from ground = 0-10° from vertical)
+      pitch=ang*(0.4+Math.random()*.6);
+      yaw=Math.random()*Math.PI*2; // fully random azimuth, independent
+    }else if(c===']'){
+      pushLeaves(pos, Math.max(baseR*Math.pow(.68,depth),.004));
+      const s=stack.pop(); pos=s.pos; pitch=s.pitch; yaw=s.yaw; depth=s.depth;
+    }
+  }
+  pushLeaves(pos, baseR*.5);
+
+  const group=new THREE.Group();
+
+  if(barkGeos.length){
+    const barkCol=new THREE.Color(.13+Math.random()*.06,.09+df*.02+Math.random()*.03,.03);
+    const merged=mergeGeos(barkGeos,barkMats);
+    merged.computeVertexNormals();
+    group.add(new THREE.Mesh(merged,new THREE.MeshLambertMaterial({color:barkCol})));
+    // Dispose source geos
+    barkGeos.forEach(g=>g.dispose());
+  }
+  if(leafGeos.length){
+    const lightF=1-df*.45;
+    const leafCol=new THREE.Color(.04+Math.random()*.03,.10+Math.random()*.07*lightF,.01);
+    const merged=mergeGeos(leafGeos,leafMats2);
+    group.add(new THREE.Mesh(merged,new THREE.MeshLambertMaterial({
+      color:leafCol,side:THREE.DoubleSide,transparent:true,opacity:.88})));
+    leafGeos.forEach(g=>g.dispose());
+  }
+  return group;
+}
+function makeMushroom(x,z,scale=1,col){
+  const g=new THREE.Group();
+
+  // Randomise type: small delicate vs chunky toadstool vs flat bracket
+  const type=Math.random();
+  const stalkH = rnd(.05,.18)*scale;
+  const stalkR = rnd(.018,.055)*scale;
+  const capR   = rnd(.10,.30)*scale;   // cap radius (wide relative to stalk)
+  const capH   = capR * rnd(.35,.60);  // cap height (flatter = more realistic)
+
+  // ── STALK — slightly bulging at base, narrow at top ──
+  // Use a lathe-style approach: CylinderGeometry segments, then squish vertices
+  const stalkGeo = new THREE.CylinderGeometry(
+    stalkR * 0.75,   // top (narrower)
+    stalkR * 1.15,   // base (wider)
+    stalkH, 8, 4
+  );
+  // Bulge the middle slightly
+  const stPos = stalkGeo.attributes.position;
+  for(let i=0;i<stPos.count;i++){
+    const y  = stPos.getY(i);
+    const t2 = (y + stalkH/2) / stalkH; // 0=base 1=top
+    const bulge = Math.sin(t2*Math.PI)*0.18 + 1;
+    stPos.setX(i, stPos.getX(i)*bulge);
+    stPos.setZ(i, stPos.getZ(i)*bulge);
+  }
+  stalkGeo.computeVertexNormals();
+
+  const stalkColor = new THREE.Color(
+    .62+Math.random()*.18,
+    .55+Math.random()*.14,
+    .38+Math.random()*.10
+  );
+  const stalk = new THREE.Mesh(stalkGeo,
+    new THREE.MeshLambertMaterial({color:stalkColor}));
+  stalk.position.y = stalkH/2;
+  g.add(stalk);
+
+  // ── CAP — wide convex dome built from a cone + sphere combo ──
+  // Bottom cone (the gills/underside) — flat disc shape
+  const gillGeo = new THREE.CylinderGeometry(
+    capR*0.98, capR*0.15, capH*0.25, 12, 1
+  );
+  const gill = new THREE.Mesh(gillGeo,
+    new THREE.MeshLambertMaterial({
+      color: new THREE.Color(
+        stalkColor.r*.9, stalkColor.g*.85, stalkColor.b*.75
+      )
+    }));
+  gill.position.y = stalkH + capH*0.12;
+  g.add(gill);
+
+  // Top dome — squashed sphere, wide and low
+  const domeGeo = new THREE.SphereGeometry(capR, 12, 8, 0, Math.PI*2, 0, Math.PI*0.52);
+  // Squash Y to make it flatter
+  const dPos = domeGeo.attributes.position;
+  for(let i=0;i<dPos.count;i++){
+    dPos.setY(i, dPos.getY(i) * (capH/capR));
+  }
+  domeGeo.computeVertexNormals();
+
+  const capColor = col || new THREE.Color(
+    rnd(.30,.70), rnd(.12,.38), rnd(.03,.14)
+  );
+  const dome = new THREE.Mesh(domeGeo,
+    new THREE.MeshLambertMaterial({color:capColor}));
+  dome.position.y = stalkH + capH*0.25;
+  g.add(dome);
+
+  // ── SPOTS — only for amanita-type; placed ON the dome surface ──
+  if(Math.random() > 0.45){
+    const nSpots = Math.floor(rnd(3,8));
+    for(let i=0;i<nSpots;i++){
+      const ang = (i/nSpots)*Math.PI*2 + Math.random()*.8;
+      const el  = rnd(0.15, 0.65); // elevation angle on dome
+      // Position on dome surface
+      const sr = capR * Math.cos(el) * 0.88;
+      const sy = (Math.sin(el) * capH * 0.9);
+      const spGeo = new THREE.SphereGeometry(capR*.055, 5, 4);
+      // Flatten spot so it sits flush
+      const sPts = spGeo.attributes.position;
+      for(let j=0;j<sPts.count;j++) sPts.setY(j, sPts.getY(j)*.35);
+      spGeo.computeVertexNormals();
+      const spot = new THREE.Mesh(spGeo,
+        new THREE.MeshLambertMaterial({
+          color:new THREE.Color(.92,.90,.85)
+        }));
+      spot.position.set(
+        Math.cos(ang)*sr,
+        stalkH + capH*0.25 + sy,
+        Math.sin(ang)*sr
+      );
+      g.add(spot);
+    }
+  }
+
+  g.position.set(x, 0, z);
+  g.rotation.y = Math.random()*Math.PI*2;
+  // Slight random lean
+  g.rotation.z = (Math.random()-.5)*.12;
+  g.rotation.x = (Math.random()-.5)*.08;
+  scene.add(g);
+  return g;
+}
+function makeTileMushroom(x,z,scale,col){ return makeMushroom(x,z,scale,col); }
+
+function makeGlowTex(hexColor, size=128){
+  const cv=document.createElement('canvas');
+  cv.width=cv.height=size;
+  const ctx=cv.getContext('2d');
+  const r=new THREE.Color(hexColor);
+  const col=`rgba(${Math.round(r.r*255)},${Math.round(r.g*255)},${Math.round(r.b*255)}`;
+  const gr=ctx.createRadialGradient(size/2,size/2,0,size/2,size/2,size/2);
+  gr.addColorStop(0,`${col},1)`);
+  gr.addColorStop(.2,`${col},.7)`);
+  gr.addColorStop(.6,`${col},.2)`);
+  gr.addColorStop(1,`${col},0)`);
+  ctx.fillStyle=gr; ctx.fillRect(0,0,size,size);
+  return new THREE.CanvasTexture(cv);
+}
+
+// ── Question-mark sprite texture (2D-game pickup style) ──
+function makeQMarkTex(size=256){
+  const cv=document.createElement('canvas');
+  cv.width=cv.height=size;
+  const ctx=cv.getContext('2d');
+  // Soft outer glow
+  const gr=ctx.createRadialGradient(size/2,size/2,0,size/2,size/2,size/2);
+  gr.addColorStop(0,'rgba(220,235,160,.55)');
+  gr.addColorStop(.35,'rgba(180,210,120,.30)');
+  gr.addColorStop(.7,'rgba(140,180,90,.08)');
+  gr.addColorStop(1,'rgba(140,180,90,0)');
+  ctx.fillStyle=gr;
+  ctx.fillRect(0,0,size,size);
+  // Inner bright disc (the "coin" face)
+  const disc=ctx.createRadialGradient(size/2,size/2,0,size/2,size/2,size*.32);
+  disc.addColorStop(0,'rgba(245,250,210,.95)');
+  disc.addColorStop(.7,'rgba(200,220,140,.6)');
+  disc.addColorStop(1,'rgba(200,220,140,0)');
+  ctx.fillStyle=disc;
+  ctx.fillRect(0,0,size,size);
+  // The "?"
+  ctx.font=`bold ${Math.floor(size*.45)}px Georgia, "Cormorant Garamond", serif`;
+  ctx.textAlign='center';
+  ctx.textBaseline='middle';
+  ctx.shadowColor='rgba(20,40,10,.85)';
+  ctx.shadowBlur=size*.04;
+  ctx.fillStyle='#1a2a08';
+  ctx.fillText('?', size/2, size/2 + size*.03);
+  // Subtle highlight stroke
+  ctx.shadowBlur=0;
+  ctx.strokeStyle='rgba(255,255,220,.4)';
+  ctx.lineWidth=size*.008;
+  ctx.strokeText('?', size/2, size/2 + size*.03);
+  return new THREE.CanvasTexture(cv);
+}
+function tileZStart(idx){ return CAM_START - idx*TILE_SIZE; }
+function tileZEnd(idx){ return tileZStart(idx) - TILE_SIZE; }
+
+function spawnTile(idx){
+  const zStart=tileZStart(idx);
+  const zEnd=tileZEnd(idx);
+  const objs=[];
+
+  // Deep factor for this tile (fully deep after tile 1)
+  const tileDf=Math.min(1, idx/1.2);
+
+  // ── TREES — 18-28 per tile, denser when deep
+  const treeCount=Math.round(18+tileDf*10);
+  for(let i=0;i<treeCount;i++){
+    const x=rnd(-26,26);
+    const z=rnd(zEnd+1, zStart-1);
+    const h=rnd(10+tileDf*8, 16+tileDf*12);
+    const r=rnd(1.2+tileDf*.5, 2.2+tileDf*1.2);
+    const g=makeTileTree(x,z,h,r,tileDf);
+    objs.push(g);
+  }
+
+  // ── SIDE WALL TREES — always flank the path
+  for(let i=0;i<10;i++){
+    const side=i%2===0?-1:1;
+    const x=side*rnd(18,34);
+    const z=rnd(zEnd+1, zStart-1);
+    const h=rnd(12+tileDf*6, 22+tileDf*8);
+    const r=rnd(1.8, 3.2+tileDf*.8);
+    const g=makeTileTree(x,z,h,r,tileDf);
+    objs.push(g);
+  }
+
+  // ── SAPLINGS
+  for(let i=0;i<8;i++){
+    const x=rnd(-20,20);
+    const z=rnd(zEnd+.5, zStart-.5);
+    const sh=rnd(.5,2.1);
+    const sg=makeTileSapling(x,z,sh,tileDf);
+    objs.push(sg);
+  }
+
+  // ── SHRUBS
+  for(let i=0;i<30;i++){
+    const x=rnd(-24,24);
+    const z=rnd(zEnd+.5, zStart-.5);
+    const sGeo=new THREE.SphereGeometry(rnd(.2,.6),6,4);
+    const sMat=new THREE.MeshLambertMaterial({
+      color:new THREE.Color(.03+Math.random()*.03,.06+Math.random()*.06,.01),
+      transparent:true,opacity:.85});
+    const sh=new THREE.Mesh(sGeo,sMat);
+    sh.position.set(x,rnd(.1,.4),z);
+    sh.scale.y=rnd(.4,.7);
+    scene.add(sh);
+    objs.push(sh);
+  }
+
+  // ── FERNS
+  for(let i=0;i<50;i++){
+    const x=rnd(-22,22);
+    const z=rnd(zEnd+.2, zStart-.2);
+    const s=rnd(.2,.75);
+    const fGeo=new THREE.PlaneGeometry(s,s);
+    const fMat=new THREE.MeshLambertMaterial({
+      color:new THREE.Color(.03+Math.random()*.04,.08+Math.random()*.07,.01),
+      side:THREE.DoubleSide,transparent:true,opacity:.85});
+    const f=new THREE.Mesh(fGeo,fMat);
+    f.position.set(x,.02,z);
+    f.rotation.x=-Math.PI/2+(Math.random()-.5)*.5;
+    f.rotation.z=Math.random()*Math.PI*2;
+    scene.add(f);
+    objs.push(f);
+  }
+
+  // ── GROUND LITTER
+  for(let i=0;i<20;i++){
+    const x=rnd(-24,24);
+    const z=rnd(zEnd+.1, zStart-.1);
+    const lg=new THREE.PlaneGeometry(.3+Math.random()*.6,.3+Math.random()*.6);
+    const lm=new THREE.MeshLambertMaterial({
+      color:new THREE.Color(.10+Math.random()*.06,.14+Math.random()*.08,.03),
+      side:THREE.DoubleSide});
+    const lf=new THREE.Mesh(lg,lm);
+    lf.rotation.x=-Math.PI/2+(Math.random()-.5)*.3;
+    lf.rotation.z=Math.random()*Math.PI*2;
+    lf.position.set(x,.01,z);
+    scene.add(lf);
+    objs.push(lf);
+  }
+
+  // ── MUSHROOMS (scattered, more in deep tiles)
+  const shroomCount=Math.round(4+tileDf*12);
+  for(let i=0;i<shroomCount;i++){
+    const x=rnd(-18,18);
+    const z=rnd(zEnd+.3, zStart-.3);
+    const sc=rnd(.5,2.0);
+    const tileDf2=Math.min(1,idx/1.5);
+    const r2=rnd(.25,.6)-tileDf2*.08;
+    const g2=rnd(.12,.32)-tileDf2*.04;
+    const b2=rnd(.04,.14);
+    const col=new THREE.Color(r2,g2,b2);
+    const mg=makeTileMushroom(x,z,sc,col);
+    objs.push(mg);
+  }
+
+  tileMeshes.set(idx,objs);
+}
+function makeTileTree(x,z,h,r,df){
+  const g=new THREE.Group();
+  const barkL=.08-df*.05;
+  const tGeo=new THREE.CylinderGeometry(r*.28,r*.55,h,7,4,false);
+  const tPos=tGeo.attributes.position;
+  for(let i=0;i<tPos.count;i++){
+    const y=tPos.getY(i); const frac=(y+h/2)/h;
+    tPos.setX(i,tPos.getX(i)+(Math.random()-.5)*.08*h*frac);
+    tPos.setZ(i,tPos.getZ(i)+(Math.random()-.5)*.06*h*frac);
+  }
+  tGeo.computeVertexNormals();
+  const tMat=new THREE.MeshLambertMaterial({
+    color:new THREE.Color(barkL+.04,barkL+.02,barkL)});
+  const trunk=new THREE.Mesh(tGeo,tMat);
+  trunk.position.y=h/2; trunk.castShadow=true;
+  g.add(trunk);
+
+  const numLayers=Math.round(2+df*4);
+  const cBase=new THREE.Color(.04+df*.01+Math.random()*.02,.09+df*.02+Math.random()*.04,.02);
+  for(let i=0;i<numLayers;i++){
+    const frac=i/(numLayers-1||1);
+    const ly=h*.6+frac*h*.45;
+    const lr=r*(1.1-frac*.3)+Math.random()*.4;
+    const cGeo=new THREE.SphereGeometry(lr,7,5);
+    const cP=cGeo.attributes.position;
+    for(let j=0;j<cP.count;j++){
+      const nx=cP.getX(j),ny=cP.getY(j),nz=cP.getZ(j);
+      const len=Math.sqrt(nx*nx+ny*ny+nz*nz)||1;
+      cP.setXYZ(j,nx/len*len*(1+(Math.random()-.5)*.35),
+        ny/len*len*(1+(Math.random()-.5)*.25),
+        nz/len*len*(1+(Math.random()-.5)*.35));
+    }
+    cGeo.computeVertexNormals();
+    const lightF=1-df*.6;
+    const cColor=cBase.clone().multiplyScalar(.5+lightF*.8);
+    const cMat=new THREE.MeshLambertMaterial({color:cColor,transparent:true,opacity:.92});
+    const cap=new THREE.Mesh(cGeo,cMat);
+    cap.position.set((Math.random()-.5)*r*.5,ly,(Math.random()-.5)*r*.5);
+    cap.castShadow=true; g.add(cap);
+  }
+  // buttress roots
+  const nr=Math.round(3+df*2);
+  for(let i=0;i<nr;i++){
+    const ang=i/nr*Math.PI*2+Math.random()*.4;
+    const rGeo=new THREE.CylinderGeometry(.025,.18,.65+df*.25,4,1);
+    const rMat=new THREE.MeshLambertMaterial({color:new THREE.Color(.05,.03,.01)});
+    const root=new THREE.Mesh(rGeo,rMat);
+    root.position.set(Math.cos(ang)*r*.5,.1,Math.sin(ang)*r*.5);
+    root.rotation.z=Math.cos(ang)*.4; root.rotation.x=Math.sin(ang)*.4;
+    g.add(root);
+  }
+  g.position.set(x,0,z);
+  g.rotation.y=Math.random()*Math.PI*2;
+  scene.add(g);
+  return g;
+}
+function makeTileSapling(x,z,sh,df){
+  const sg=makeLSapling(sh,df);
+  sg.position.set(x,0,z); sg.rotation.y=Math.random()*Math.PI*2;
+  scene.add(sg); return sg;
+}
+
+const LS_RULES=[
+  {axiom:'F',rules:{F:'F[+F]F[-F]F'},angle:25,gen:3},
+  {axiom:'X',rules:{X:'F[+X][-X]FX',F:'FF'},angle:26,gen:3},
+  {axiom:'F',rules:{F:'F[+F][-F]'},angle:28,gen:3},
+  {axiom:'X',rules:{X:'F[+X][++X][-X]',F:'FF'},angle:20,gen:3},
+];
+
+function buildScene(){
+const treeSpecs=[];
+
+// BEHIND CAMERA at start — enclosing walls so you never see "outside"
+for(let i=0;i<24;i++){
+  const side=i<12?-1:1;
+  treeSpecs.push({x:side*(rnd(8,40)),z:rnd(16,32),h:rnd(7,13),r:rnd(1,2)});
+}
+// Also directly behind, a dense back wall
+for(let i=0;i<16;i++){
+  treeSpecs.push({x:rnd(-40,40),z:rnd(19,34),h:rnd(8,14),r:rnd(1.2,2)});
+}
+
+// Edge band  z: 14 down to 0
+for(let i=0;i<16;i++){
+  treeSpecs.push({x:rnd(-40,40),z:rnd(12,2),h:rnd(6,10),r:rnd(.8,1.4)});
+}
+// Near-mid band  z: 0 to -22
+for(let i=0;i<28;i++){
+  treeSpecs.push({x:rnd(-55,55),z:rnd(0,-22),h:rnd(8,13),r:rnd(1,1.8)});
+}
+// Mid band  z: -22 to -42
+for(let i=0;i<40;i++){
+  treeSpecs.push({x:rnd(-70,70),z:rnd(-22,-42),h:rnd(10,16),r:rnd(1.2,2.1)});
+}
+// Deep band  z: -42 to -65
+for(let i=0;i<50;i++){
+  treeSpecs.push({x:rnd(-80,80),z:rnd(-42,-65),h:rnd(13,20),r:rnd(1.5,2.8)});
+}
+// Very deep  z: -65 to -90
+for(let i=0;i<50;i++){
+  treeSpecs.push({x:rnd(-85,85),z:rnd(-65,-90),h:rnd(16,24),r:rnd(2,3.2)});
+}
+// Terminal deep  z: -90 to -130
+for(let i=0;i<60;i++){
+  treeSpecs.push({x:rnd(-90,90),z:rnd(-90,-130),h:rnd(18,28),r:rnd(2.2,3.8)});
+}
+// Side walls throughout — trees flanking the path at all depths
+for(let i=0;i<80;i++){
+  const side=i%2===0?-1:1;
+  treeSpecs.push({x:side*rnd(30,80),z:rnd(10,-130),h:rnd(10,22),r:rnd(1.5,3)});
+}
+
+// RING FILL — scatter trees across the circular disc to plug lateral gaps
+// at the edges of the new larger boundary (radius 100 around z=-60).
+{
+  const CX=0, CZ=-60, maxR=95;
+  for(let i=0;i<120;i++){
+    // Uniform disc sampling; bias toward outer ring where existing bands are sparse
+    const rFrac = Math.sqrt(Math.random()*0.5 + 0.5); // bias r^2 toward outer half
+    const r = rFrac * maxR;
+    const ang = Math.random()*Math.PI*2;
+    const x = CX + Math.cos(ang)*r;
+    const z = CZ + Math.sin(ang)*r;
+    // Skip trees too close to the spawn corridor
+    if(z > 12 && Math.abs(x) < 8) continue;
+    treeSpecs.push({x,z,h:rnd(10,22),r:rnd(1.3,2.8)});
+  }
+}
+
+treeSpecs.forEach(t=>makeTree(t.x,t.z,{h:t.h,r:t.r}));
+
+// ── UNDERSTORY SHRUBS ──
+for(let i=0;i<200;i++){
+  const z=rnd(-5,-112);
+  const df=depthFactor(z);
+  const sg=new THREE.SphereGeometry(rnd(.2,.65),6,4);
+  const sm=new THREE.MeshLambertMaterial({
+    color:new THREE.Color(.03+Math.random()*.03,.07+Math.random()*.06,.01),
+    transparent:true,opacity:.8+df*.2});
+  const sh=new THREE.Mesh(sg,sm);
+  sh.position.set(rnd(-24,24),rnd(.1,.45),z);
+  sh.scale.y=rnd(.4,.7);
+  sh.castShadow=true;
+  scene.add(sh);
+}
+
+// ═══════════════════════════════════════════════
+// L-SYSTEM SAPLING GENERATOR
+// Merges ALL branch + leaf geometry into 2 meshes (bark + leaf)
+// per sapling — 2 draw calls instead of hundreds.
+// ═══════════════════════════════════════════════
+
+// Simpler rules at gen=3 — manageable branch counts
+// LS_RULES moved to top level
+
+// Manual geometry merger — transforms vertices of each piece into
+// a shared accumulated buffer. Returns a single merged BufferGeometry.
+
+
+// ── PLACE STATIC L-SYSTEM SAPLINGS ──
+for(let i=0;i<60;i++){
+  const z=rnd(-8,-112); const df=depthFactor(z);
+  const sh=rnd(.65,2.1);
+  const sg=makeLSapling(sh,df);
+  sg.position.set(rnd(-20,20),0,z); sg.rotation.y=Math.random()*Math.PI*2;
+  scene.add(sg);
+}
+// ── FERN LEAVES (ground planes) ──
+for(let i=0;i<250;i++){
+  const z=rnd(-2,-112);
+  const s=rnd(.2,.8);
+  const fg=new THREE.PlaneGeometry(s,s);
+  const df=depthFactor(z);
+  const fm=new THREE.MeshLambertMaterial({
+    color:new THREE.Color(.03+Math.random()*.04,.09+Math.random()*.07-.02*df,.01),
+    side:THREE.DoubleSide,transparent:true,opacity:.85});
+  const ff=new THREE.Mesh(fg,fm);
+  ff.position.set(rnd(-22,22),.02,z);
+  ff.rotation.x=-Math.PI/2+(Math.random()-.5)*.5;
+  ff.rotation.z=Math.random()*Math.PI*2;
+  scene.add(ff);
+}
+
+// ── GOD RAYS (light shafts for edge) ──
+godRays=[];
+for(let i=0;i<10;i++){
+  const gg=new THREE.CylinderGeometry(.1+Math.random()*.25,.7+Math.random()*.6,10,6,1,true);
+  const gm=new THREE.MeshBasicMaterial({
+    color:0xfff5d0,transparent:true,opacity:.045,side:THREE.DoubleSide,depthWrite:false});
+  const gr=new THREE.Mesh(gg,gm);
+  gr.position.set(rnd(-14,14),5,rnd(0,16));
+  gr.rotation.z=(Math.random()-.5)*.35;
+  gr.rotation.x=(Math.random()-.5)*.15;
+  scene.add(gr);
+  godRays.push(gr);
+}
+
+// ── LIGHT DAPPLES on ground (edge only) ──
+const dappleCount=30;
+const dappleGeo=new THREE.BufferGeometry();
+const dPos=new Float32Array(dappleCount*3);
+for(let i=0;i<dappleCount;i++){
+  dPos[i*3]=rnd(-14,14); dPos[i*3+1]=.05; dPos[i*3+2]=rnd(1,16);
+}
+dappleGeo.setAttribute('position',new THREE.BufferAttribute(dPos,3));
+const dappleCanvas=document.createElement('canvas');
+dappleCanvas.width=dappleCanvas.height=64;
+const dctx=dappleCanvas.getContext('2d');
+const dg=dctx.createRadialGradient(32,32,0,32,32,32);
+dg.addColorStop(0,'rgba(255,245,180,.55)');
+dg.addColorStop(1,'rgba(255,245,180,0)');
+dctx.fillStyle=dg; dctx.fillRect(0,0,64,64);
+dappleMat=new THREE.PointsMaterial({
+  size:2.2,map:new THREE.CanvasTexture(dappleCanvas),
+  transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,opacity:.7});
+dapples=new THREE.Points(dappleGeo,dappleMat);
+scene.add(dapples);
+
+// ── DUST MOTES (edge) ──
+const dustGeo=new THREE.BufferGeometry();
+const dustPos=new Float32Array(120*3);
+dustPhase=new Float32Array(120);
+for(let i=0;i<120;i++){
+  dustPos[i*3]=rnd(-12,12); dustPos[i*3+1]=rnd(.5,5); dustPos[i*3+2]=rnd(0,16);
+  dustPhase[i]=Math.random()*Math.PI*2;
+}
+dustGeo.setAttribute('position',new THREE.BufferAttribute(dustPos.slice(),3));
+dustMat=new THREE.PointsMaterial({
+  size:.04,transparent:true,color:0xfff8e0,opacity:.5,
+  blending:THREE.AdditiveBlending,depthWrite:false});
+dust=new THREE.Points(dustGeo,dustMat);
+scene.add(dust);
+
+// ── DEEP FOREST SPORES ──
+const sporeGeo=new THREE.BufferGeometry();
+const sporePos=new Float32Array(300*3);
+const sporePhase=new Float32Array(300);
+for(let i=0;i<300;i++){
+  sporePos[i*3]=rnd(-28,28); sporePos[i*3+1]=rnd(.3,7); sporePos[i*3+2]=rnd(-20,-112);
+  sporePhase[i]=Math.random()*Math.PI*2;
+}
+sporeGeo.setAttribute('position',new THREE.BufferAttribute(sporePos.slice(),3));
+sporeMat=new THREE.PointsMaterial({
+  size:.055,transparent:true,color:0xc0e8c0,opacity:.35,
+  blending:THREE.AdditiveBlending,depthWrite:false});
+spores=new THREE.Points(sporeGeo,sporeMat);
+scene.add(spores);
+
+// ═══════════════════════════════════════════════
+// STREAM — wide, prominent, mid-deep forest z=-55 to -75
+// Cuts diagonally across the scene
+// ═══════════════════════════════════════════════
+
+// -- Carved stream bed (wider, visibly depressed)
+const streamBedGeo=new THREE.PlaneGeometry(STREAM_W*2+4,8,40,16);
+const sbPos=streamBedGeo.attributes.position;
+for(let i=0;i<sbPos.count;i++){
+  const lx=sbPos.getX(i), lz=sbPos.getZ(i);
+  const fromCentre=Math.abs(lz)/4;
+  sbPos.setY(i,-0.22*(1-fromCentre)+(Math.random()-.5)*.04);
+}
+streamBedGeo.computeVertexNormals();
+const streamBedMat=new THREE.MeshLambertMaterial({color:0x141e12});
+const streamBed=new THREE.Mesh(streamBedGeo,streamBedMat);
+streamBed.rotation.x=-Math.PI/2;
+streamBed.position.set(0,-.12,STREAM_Z);
+streamBed.rotation.z=0.10;
+scene.add(streamBed);
+
+// -- Gravel/stone texture layer (lighter patches)
+const gravelGeo=new THREE.PlaneGeometry(STREAM_W*2+2,6.5,30,12);
+const gravelMat=new THREE.MeshLambertMaterial({color:0x2a3825});
+const gravel=new THREE.Mesh(gravelGeo,gravelMat);
+gravel.rotation.x=-Math.PI/2;
+gravel.position.set(0,-.19,STREAM_Z);
+gravel.rotation.z=0.10;
+scene.add(gravel);
+
+// -- Stones in stream bed — larger and more numerous
+for(let i=0;i<120;i++){
+  const sx=rnd(-STREAM_W*.9,STREAM_W*.9);
+  const sz=STREAM_Z+rnd(-3,3)+sx*.05;
+  const sr=rnd(.04,.32);
+  const sg2=new THREE.SphereGeometry(sr,6,4);
+  const wetness=Math.random();
+  const sm2=new THREE.MeshLambertMaterial({
+    color:new THREE.Color(rnd(.06,.20),rnd(.08,.22),rnd(.06,.16))});
+  const st=new THREE.Mesh(sg2,sm2);
+  st.position.set(sx,-.12+sr*.5,sz);
+  st.scale.y=rnd(.25,.55);
+  st.rotation.y=Math.random()*Math.PI;
+  scene.add(st);
+}
+
+// -- Water surface — wide, with clear blue-green tint
+const waterGeo=new THREE.PlaneGeometry(STREAM_W*2,5.5,60,24);
+waterOrigY=[];
+const wPos=waterGeo.attributes.position;
+for(let i=0;i<wPos.count;i++) waterOrigY.push(wPos.getY(i));
+
+const waterMat=new THREE.MeshLambertMaterial({
+  color:0x2a6e5a,transparent:true,opacity:.82,side:THREE.DoubleSide});
+waterMesh=new THREE.Mesh(waterGeo,waterMat);
+waterMesh.rotation.x=-Math.PI/2;
+waterMesh.position.set(0,-.04,STREAM_Z);
+waterMesh.rotation.z=0.10;
+scene.add(waterMesh);
+
+// -- Bright specular shimmer (additive)
+const shimGeo=new THREE.PlaneGeometry(STREAM_W*2,5.5,30,12);
+const shimMat=new THREE.MeshBasicMaterial({
+  color:0x90e8c8,transparent:true,opacity:0,
+  blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide});
+shimMesh=new THREE.Mesh(shimGeo,shimMat);
+shimMesh.rotation.x=-Math.PI/2;
+shimMesh.position.set(0,0,STREAM_Z);
+shimMesh.rotation.z=0.10;
+scene.add(shimMesh);
+
+// -- Second shimmer for flowing highlight streaks
+const shim2Geo=new THREE.PlaneGeometry(STREAM_W*2,5.5,20,8);
+const shim2Mat=new THREE.MeshBasicMaterial({
+  color:0xc0fff0,transparent:true,opacity:0,
+  blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide});
+shim2Mesh=new THREE.Mesh(shim2Geo,shim2Mat);
+shim2Mesh.rotation.x=-Math.PI/2;
+shim2Mesh.position.set(0,.005,STREAM_Z);
+shim2Mesh.rotation.z=0.10;
+scene.add(shim2Mesh);
+
+// -- Raised muddy banks
+for(let side=-1;side<=1;side+=2){
+  for(let seg=0;seg<5;seg++){
+    const bGeo=new THREE.PlaneGeometry(12,3.5,15,8);
+    const bkPos=bGeo.attributes.position;
+    for(let i=0;i<bkPos.count;i++){
+      bkPos.setY(i, Math.random()*.06+(Math.random()-.5)*.03);
+    }
+    bGeo.computeVertexNormals();
+    const bMat=new THREE.MeshLambertMaterial({
+      color:new THREE.Color(.12+Math.random()*.04,.18+Math.random()*.06,.04)});
+    const bank=new THREE.Mesh(bGeo,bMat);
+    bank.rotation.x=-Math.PI/2;
+    bank.position.set((seg-2)*11,.0,STREAM_Z+side*3.8);
+    bank.rotation.z=0.10;
+    scene.add(bank);
+  }
+}
+
+// -- Mossy boulders on banks
+for(let i=0;i<35;i++){
+  const side=i%2===0?1:-1;
+  const rx=rnd(-STREAM_W*.85,STREAM_W*.85);
+  const rz=STREAM_Z+side*rnd(2.5,5.5)+rx*.04;
+  const rr=rnd(.12,.55);
+  const rg2=new THREE.SphereGeometry(rr,7,5);
+  const rm=new THREE.MeshLambertMaterial({
+    color:new THREE.Color(rnd(.06,.16),rnd(.14,.26),rnd(.05,.12))});
+  const rock=new THREE.Mesh(rg2,rm);
+  rock.position.set(rx,rr*.35,rz);
+  rock.scale.y=rnd(.45,.75);
+  scene.add(rock);
+}
+
+// -- Exposed mid-stream rocks above water line
+for(let i=0;i<20;i++){
+  const rx=rnd(-STREAM_W*.7,STREAM_W*.7);
+  const rz=STREAM_Z+rnd(-2.2,2.2)+rx*.04;
+  const rr=rnd(.08,.28);
+  const rg3=new THREE.SphereGeometry(rr,6,4);
+  const rm3=new THREE.MeshLambertMaterial({
+    color:new THREE.Color(.18+Math.random()*.1,.22+Math.random()*.1,.14+Math.random()*.06)});
+  const midRock=new THREE.Mesh(rg3,rm3);
+  midRock.position.set(rx,.02,rz);
+  midRock.scale.y=rnd(.3,.5);
+  scene.add(midRock);
+}
+
+// -- Water flow particles (moving downstream)
+flowCount=120;
+const flowGeo=new THREE.BufferGeometry();
+const flowPos=new Float32Array(flowCount*3);
+flowPhase=new Float32Array(flowCount);
+for(let i=0;i<flowCount;i++){
+  flowPos[i*3]=rnd(-STREAM_W*.85,STREAM_W*.85);
+  flowPos[i*3+1]=.01;
+  flowPos[i*3+2]=STREAM_Z+rnd(-2.5,2.5);
+  flowPhase[i]=Math.random()*STREAM_W*2;
+}
+flowGeo.setAttribute('position',new THREE.BufferAttribute(flowPos.slice(),3));
+const flowTex=(()=>{
+  const cv=document.createElement('canvas'); cv.width=32; cv.height=8;
+  const ctx=cv.getContext('2d');
+  const g=ctx.createLinearGradient(0,0,32,0);
+  g.addColorStop(0,'rgba(200,255,230,0)');
+  g.addColorStop(.4,'rgba(200,255,230,.9)');
+  g.addColorStop(1,'rgba(200,255,230,0)');
+  ctx.fillStyle=g; ctx.fillRect(0,0,32,8);
+  return new THREE.CanvasTexture(cv);
+})();
+flowMat=new THREE.PointsMaterial({
+  size:.45,map:flowTex,transparent:true,
+  blending:THREE.AdditiveBlending,depthWrite:false,opacity:.7});
+flowPoints=new THREE.Points(flowGeo,flowMat);
+scene.add(flowPoints);
+
+// Ripple ring particles
+const rippleGeo=new THREE.BufferGeometry();
+const ripplePos2=new Float32Array(60*3);
+const ripplePhase=new Float32Array(60);
+for(let i=0;i<60;i++){
+  ripplePos2[i*3]=rnd(-STREAM_W*.8,STREAM_W*.8);
+  ripplePos2[i*3+1]=.015;
+  ripplePos2[i*3+2]=STREAM_Z+rnd(-2.3,2.3);
+  ripplePhase[i]=Math.random()*Math.PI*2;
+}
+rippleGeo.setAttribute('position',new THREE.BufferAttribute(ripplePos2.slice(),3));
+const rippleTex=(()=>{
+  const cv=document.createElement('canvas'); cv.width=cv.height=64;
+  const ctx=cv.getContext('2d');
+  ctx.strokeStyle='rgba(160,240,200,.85)'; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.arc(32,32,24,0,Math.PI*2); ctx.stroke();
+  ctx.strokeStyle='rgba(160,240,200,.4)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.arc(32,32,30,0,Math.PI*2); ctx.stroke();
+  return new THREE.CanvasTexture(cv);
+})();
+rippleMat=new THREE.PointsMaterial({
+  size:.55,map:rippleTex,transparent:true,
+  blending:THREE.AdditiveBlending,depthWrite:false,opacity:.6});
+const ripples=new THREE.Points(rippleGeo,rippleMat);
+scene.add(ripples);
+
+// -- Dense streamside vegetation
+for(let i=0;i<60;i++){
+  const side=i%2===0?1:-1;
+  const fx=rnd(-STREAM_W*.9,STREAM_W*.9);
+  const fz=STREAM_Z+side*rnd(2.2,6)+fx*.04;
+  const fs=rnd(.3,.9);
+  const fg2=new THREE.PlaneGeometry(fs,fs);
+  const fm2=new THREE.MeshLambertMaterial({
+    color:new THREE.Color(.05+Math.random()*.04,.13+Math.random()*.09,.02),
+    side:THREE.DoubleSide,transparent:true,opacity:.9});
+  const ff2=new THREE.Mesh(fg2,fm2);
+  ff2.position.set(fx,.02,fz);
+  ff2.rotation.x=-Math.PI/2+(Math.random()-.5)*.6;
+  ff2.rotation.z=Math.random()*Math.PI*2;
+  scene.add(ff2);
+}
+
+// ═══════════════════════════════════════════════
+// FALLEN LOG across stream
+// ═══════════════════════════════════════════════
+const logGroup=new THREE.Group();
+
+// Main log body — shorter, just crossing the stream
+const logH=10;  // short log crossing the stream
+const logGeo=new THREE.CylinderGeometry(.18,.26,logH,10,6,false);
+// Add bark texture by displacing vertices slightly
+const lgPos=logGeo.attributes.position;
+for(let i=0;i<lgPos.count;i++){
+  const angle=Math.atan2(lgPos.getX(i),lgPos.getZ(i));
+  const noise=Math.sin(angle*8+lgPos.getY(i)*3)*.015+Math.random()*.01;
+  lgPos.setX(i,lgPos.getX(i)*(1+noise));
+  lgPos.setZ(i,lgPos.getZ(i)*(1+noise));
+}
+logGeo.computeVertexNormals();
+const logMat=new THREE.MeshLambertMaterial({color:0x2a1e10});
+const logMesh=new THREE.Mesh(logGeo,logMat);
+logMesh.castShadow=true;
+logGroup.add(logMesh);
+
+// Moss patches on log
+for(let i=0;i<12;i++){
+  const mg=new THREE.SphereGeometry(rnd(.04,.12),5,4);
+  const mm=new THREE.MeshLambertMaterial({
+    color:new THREE.Color(.04+Math.random()*.04,.14+Math.random()*.10,.02)});
+  const mossP=new THREE.Mesh(mg,mm);
+  const ang=Math.random()*Math.PI*2;
+  const along=rnd(-logH*.45,logH*.45);
+  mossP.position.set(Math.cos(ang)*.28,along,Math.sin(ang)*.28);
+  logGroup.add(mossP);
+}
+
+// Bark flakes
+for(let i=0;i<8;i++){
+  const bg=new THREE.PlaneGeometry(rnd(.05,.15),rnd(.1,.25));
+  const bm=new THREE.MeshLambertMaterial({
+    color:0x1a1208,side:THREE.DoubleSide,transparent:true,opacity:.9});
+  const bk=new THREE.Mesh(bg,bm);
+  const ang=Math.random()*Math.PI*2;
+  const along=rnd(-logH*.4,logH*.4);
+  bk.position.set(Math.cos(ang)*.31,along,Math.sin(ang)*.31);
+  bk.rotation.set(Math.random(),Math.random(),Math.random());
+  logGroup.add(bk);
+}
+
+// Position log: lying across stream, slight diagonal angle
+logGroup.rotation.z=Math.PI/2;      // lay it horizontal
+logGroup.rotation.y=Math.PI/2+0.12; // slight diagonal
+logGroup.position.set(1, .20, STREAM_Z-.3); // just above water
+scene.add(logGroup);
+
+// Roots stump end
+const stumpGeo=new THREE.CylinderGeometry(.30,.48,.5,8,2);
+const stumpMat=new THREE.MeshLambertMaterial({color:0x221508});
+const stump=new THREE.Mesh(stumpGeo,stumpMat);
+stump.position.set(-4.2,.18,STREAM_Z+.5);
+stump.rotation.z=Math.PI/2;
+stump.rotation.y=0.12;
+scene.add(stump);
+
+// Root tendrils from stump
+for(let i=0;i<6;i++){
+  const ang=i/6*Math.PI*2;
+  const rGeo=new THREE.CylinderGeometry(.02,.05,.6,4,1);
+  const rMat=new THREE.MeshLambertMaterial({color:0x1a0e06});
+  const rt=new THREE.Mesh(rGeo,rMat);
+  rt.position.set(-4.2+Math.cos(ang)*.4,.1+Math.sin(ang)*.3,STREAM_Z+.5+Math.sin(ang)*.35);
+  rt.rotation.z=Math.cos(ang)*.8;
+  rt.rotation.x=Math.sin(ang)*.6;
+  scene.add(rt);
+}
+
+// ═══════════════════════════════════════════════
+// MUSHROOMS — scattered throughout forest
+// ═══════════════════════════════════════════════
+// ═══════════════════════════════════════════════
+// MUSHROOM FACTORY — shared by static + tile systems
+// Builds a realistic toadstool: thick stalk with skirt, 
+// broad convex cap using CylinderGeometry with tapered profile
+// ═══════════════════════════════════════════════
+
+// makeTileMushroom delegates to makeMushroom
+// Scatter mushrooms throughout — more near stream and deep forest
+// Near stream banks
+for(let i=0;i<30;i++){
+  const side=i%2===0?1:-1;
+  const mx2=rnd(-STREAM_W*.8,STREAM_W*.8);
+  const mz=STREAM_Z+side*rnd(3,7)+mx2*.04;
+  const scale=rnd(.6,1.8);
+  makeMushroom(mx2,mz,scale);
+}
+// Along log
+for(let i=0;i<8;i++){
+  const lx=rnd(-STREAM_W-.5,STREAM_W*.7);
+  const lz=STREAM_Z+rnd(-1,1);
+  makeMushroom(lx,lz,rnd(.4,1.0));
+}
+// Deep forest floor — clusters
+for(let i=0;i<55;i++){
+  const mz=rnd(-30,-112);
+  const mx3=rnd(-18,18);
+  const scale=rnd(.5,2.2);
+  // Darker, more muted colours in deep forest
+  const df2=depthFactor(mz);
+  const r=rnd(.25,.55)-df2*.1;
+  const g2=rnd(.12,.30)-df2*.05;
+  const b2=rnd(.04,.12);
+  makeMushroom(mx3,mz,scale,new THREE.Color(r,g2,b2));
+}
+// Cluster near fallen log on ground
+for(let i=0;i<12;i++){
+  const cx=rnd(-STREAM_W-3,-STREAM_W+1);
+  const cz=STREAM_Z+rnd(-1.5,1.5);
+  makeMushroom(cx,cz,rnd(.3,.9));
+}
+
+// store water vertex count
+waterVertCount=wPos.count;
+
+// ═══════════════════════════════════════════════
+// FIELD JOURNAL CARDS — 40 research-backed cards from
+// Kadamane Tea Estate field study. See Credits for attribution.
+// ═══════════════════════════════════════════════
+const CARD_DATA = [{"zone": "Edge", "title": "Does a road change the forest behind it?", "source": "Meghna Krishnadas", "summary": "The physical type of boundary a forest has heavily dictates its internal microclimate. A stark \"hard edge\" actively dries out the forest, while a \"soft edge\" with a closed canopy helps retain vital soil moisture.", "insights": ["Soil moisture decreases significantly near a hard edge compared to the deep forest interior.", "Hard edges dry out faster because they lack the protection of a closed canopy and are highly exposed to wind.", "A soft edge (a small dirt road with forest on both sides) manages to retain moisture because the canopy stays largely intact."], "tags": ["ForestEdges", "Microclimate", "SoilMoisture", "Fragmentation"]}, {"zone": "Edge", "title": "What changes the moment you step inside a forest?", "source": "Meghna Krishnadas", "summary": "Cross the boundary from open land into forest and the physical world shifts immediately — temperature drops, wind quiets, humidity rises. These are not small comforts. They are the precise conditions that determine which fungi, insects, and pathogens can survive and do their regulatory work.", "insights": ["Forest edges experience elevated ambient temperatures, increased light penetration, decreased relative humidity, and altered wind patterns compared to shaded interiors.", "These abiotic gradients — measured across hundreds of plots in Kadamane — are not uniform. Topography, slope, and canopy structure all reshape them locally.", "What looks like a simple temperature difference is actually a cascade: the wrong temperature means the wrong fungi, which means the wrong regulation, which means the wrong forest."], "tags": ["EdgeEffects", "Microclimate", "Ecotone", "Abiotic"]}, {"zone": "Edge", "title": "What happens when the bodyguards disappear?", "source": "Meghna Krishnadas", "summary": "In an intact forest interior, host-specific fungi and insects keep every species in check — preventing any one tree from taking over. Near the edge, the harsh microclimate makes these regulators disappear. The rules collapse. And without regulation, something unexpected happens: some species survive more, not less.", "insights": ["The specialized, moisture-dependent fungi and insects that enforce CNDD cannot survive the drier, more exposed conditions at forest edges.", "When these natural enemies vanish, some seedlings face less predation near their parents — the opposite of what happens in the interior.", "This is the paradox of fragmentation: survival of individuals can increase at the edge while diversity of the whole community collapses."], "tags": ["CNDD", "EdgeCollapse", "Regulation", "Fragmentation"]}, {"zone": "Edge", "title": "Why does a fragmented forest start looking the same everywhere?", "source": "Meghna Krishnadas", "summary": "Diversity collapse at forest edges doesn't look like destruction. It looks like sameness. When the regulating pressure of enemies disappears, the fastest-growing species fill every gap — and the dense, wildly varied mosaic of the interior becomes a monotonous repeat of a few dominant plants.", "insights": ["Without CNDD, fast-growing species lose their primary mortality pressure and begin to dominate the understory unchecked.", "Slower-growing, more chemically defended interior species — the ones that sustain biodiversity — progressively lose ground.", "The result is not a dead forest. It is a living one, but simplified — ecologically impoverished in the same way a monoculture farm is impoverished."], "tags": ["Homogenisation", "DiversityCollapse", "EdgeEffects", "Dominance"]}, {"zone": "Edge", "title": "Can a foreign smell silence a whole ecosystem?", "source": "Zu et al.", "summary": "Invasive plants don't just compete for space and light. They release chemical signals that are entirely foreign to the native ecosystem — and native insects, whose sensory systems evolved to read local signals, cannot parse them. The result is a kind of chemical jamming: the communication network of the forest goes dark.", "insights": ["Invasive species like Senna spectabilis, spreading across the Western Ghats, exude volatile compounds with no equivalent in the native chemical vocabulary.", "Studies show invasive VOCs can completely disrupt the ability of native insects to locate their host plants — effectively blinding specialist herbivores.", "When the herbivores cannot find their hosts, the pressure that drives CNDD and maintains diversity collapses — a second-order fragmentation, invisible and chemical."], "tags": ["InvasiveSpecies", "VOC", "ChemicalJamming", "SignalDisruption"]}, {"zone": "Interior", "title": "Why is it dangerous to grow up next to your own kind?", "source": "Rishiddh Jhaveri, NCBS", "summary": "In a dense forest, being surrounded by your own species drastically lowers your chance of survival. High local density attracts specialized pathogens that quickly wipe out crowded clusters.", "insights": ["This pathogen-driven death keeps any single species from taking over.", "It acts as an invisible engine that maintains the forest's high biodiversity by forcing different species to mix."], "tags": ["ForestEcology", "Biodiversity", "CNDD", "Pathogens"]}, {"zone": "Interior", "title": "Who wins when plants and insects have been fighting for 400 million years?", "source": "NCBS Lab", "summary": "The hyperdiversity of tropical forests is largely driven by a constant, invisible chemical war between plants and specialized insects.", "insights": ["When an insect evolves a way to bypass a plant's defenses, the plant must invent a new, highly specific chemical arsenal to survive.", "This constant adaptation acts as a \"divergent force,\" pushing species to continuously change and specialize rather than allowing any single plant to dominate."], "tags": ["Evolution", "Coevolution", "ChemicalWarfare", "PlantDefense"]}, {"zone": "Interior", "title": "What keeps any single species from taking over the entire forest?", "source": "Levi & Terborgh (2019) — PNAS", "summary": "When a tree dies, the open slot cannot simply be refilled by its own kind. Host-specific pathogens and insects create a lethal exclusion zone around every adult — blocking conspecifics from taking root nearby. This one small rule sustains thousands of species.", "insights": ["The exclusion zone doesn't need to be large — even one tree-crown-width of exclusion is enough to sustain over 1,000 co-existing species indefinitely.", "The rule is not rigid: even when ~50% of excluded species occasionally slip through, substantial diversity is still maintained.", "No speciation, no external dispersal, no resource partitioning required — just this one local rule, repeated across the forest floor."], "tags": ["JanzenConnell", "ExclusionZone", "CNDD", "ForestDiversity"]}, {"zone": "Interior", "title": "In a forest, is being rare actually an advantage?", "source": "Levi & Terborgh (2019) — PNAS", "summary": "Where enemy pressure operates, rarity is protection. The rarer a species becomes, the better its odds of recovery — because its enemies, concentrated around more common species, are elsewhere. The forest polices its own diversity.", "insights": ["The mathematics is precise: as species richness declines, each rare species gains a survival advantage of (S−1)/(S−2) — the advantage grows as the community gets poorer.", "This self-correcting feedback prevents drift toward monodominance without any external rescue from migration or speciation.", "Remove enemy pressure — as at forest edges — and this protection vanishes. The rarest species lose their last advantage."], "tags": ["RareSpeciesAdvantage", "Biodiversity", "SelfRegulation", "CNDD"]}, {"zone": "Interior", "title": "Does an enemy have to be perfectly specialised to keep diversity alive?", "source": "Sedio & Ostling (2013) — Ecology Letters", "summary": "The Janzen-Connell mechanism works even when enemies are not perfectly specialist — but there is a tipping point. Once an enemy's host range gets too broad, it stops protecting diversity and starts suppressing it.", "insights": ["In real tropical forests — Panama and Papua New Guinea — observed insect herbivores and fungal pathogens fall within the effective zone of specificity.", "Fungal pathogens are generally less specialist than insect herbivores, sharing more hosts across distantly related species.", "Even generalist-range enemies can still boost chemical trait diversity across a community — even when they don't increase raw species count."], "tags": ["HostSpecificity", "JanzenConnell", "FungalPathogens", "InsectHerbivores"]}, {"zone": "Understory + Soil", "title": "Can a plant be both fast and tough? (No.)", "source": "Rishiddh Jhaveri, NCBS", "summary": "Seedlings face a strict biological choice: grow fast to capture light, or grow tough to survive pests. They cannot do both simultaneously due to limited resources.", "insights": ["Fast growers invest in broad, thin leaves to dominate open space quickly.", "Slow growers build thick, dense leaves to withstand insects and drought — making them the long-term survivors of the understory."], "tags": ["GrowthDefenseTradeoff", "PlantDefense", "SeedlingSurvival"]}, {"zone": "Understory + Soil", "title": "Why do the rules of survival flip when a big tree falls?", "source": "Rishiddh Jhaveri, NCBS", "summary": "When a large canopy tree falls and floods the forest floor with light, the density rule flips. In these bright gaps, fast-growing seedlings actually thrive when surrounded by their own kind — the opposite of normal interior dynamics.", "insights": ["Abundant light changes the rules of survival entirely.", "Seedlings likely link up via shared underground fungal networks to pool nutrients and block out rival species."], "tags": ["CanopyGap", "MycorrhizalNetworks", "ForestDynamics"]}, {"zone": "Understory + Soil", "title": "Why can too much water kill a seedling?", "source": "Rishiddh Jhaveri, NCBS", "summary": "More water doesn't always guarantee better survival. While moisture is a critical resource, heavily saturated soils drastically increase deadly fungal and pathogen activity.", "insights": ["Wet conditions create a breeding ground for specialized soil pathogens.", "Fast-growing species, which lack heavy chemical defenses, are highly vulnerable and die off rapidly during wet periods."], "tags": ["SoilMoisture", "Fungi", "PlantSurvival"]}, {"zone": "Understory + Soil", "title": "Why can't one plant species win at everything?", "source": "NCBS Lab", "summary": "In a forest with limited resources, a plant cannot be perfect at everything. Survival requires strict biological trade-offs, which forces species into specific ecological niches — and this is what allows hundreds of competing species to coexist in the same patch of land.", "insights": ["Just as an athlete cannot be both an elite sprinter and an elite marathon runner, a plant cannot simultaneously maximise rapid growth and heavy physical defenses.", "Because of these biological limits, different species specialise in different strategies — which is exactly what allows them to coexist."], "tags": ["NichePartitioning", "EcologicalTradeoffs", "SpeciesCoexistence"]}, {"zone": "Understory + Soil", "title": "What's the single strongest predictor of a seedling's survival?", "source": "Vincy, NCBS", "summary": "When it comes to surviving the brutal understory, a seedling's starting height is one of the strongest predictors of its long-term survival. The taller the start, the better the odds.", "insights": ["Taller seedlings have a significantly higher probability of staying alive year after year compared to shorter ones.", "The biological imperative is to grow fast and establish a stronger root system — to escape the vulnerable, ground-level pathogen zone as quickly as possible."], "tags": ["PlantGrowth", "SeedlingSurvival", "ForestUnderstory"]}, {"zone": "Understory + Soil", "title": "If light is so important, why didn't it matter in our data?", "source": "Vincy, NCBS", "summary": "Sunlight is generally considered the most critical resource for plants. But at Kadamane, light availability was not a significant factor in seedling survival — because the forest canopy is too dense for light variation to make a difference at ground level.", "insights": ["The canopy is so dense that light gaps range only between 0% and 6% — the entire forest floor is in deep, homogeneous shade.", "With such tiny variation in light, soil moisture and nutrient conditions take over as the dominant drivers of who lives and who dies."], "tags": ["CanopyGap", "Sunlight", "TropicalForest"]}, {"zone": "Understory + Soil", "title": "How can trying too hard to find nutrients get a seedling killed?", "source": "Vincy, NCBS", "summary": "In tropical soils where phosphorus is incredibly scarce, seedlings that try too aggressively to scavenge it on their own often end up dead. In their desperate pursuit of nutrients, they trade away their physical defenses.", "insights": ["Plants that don't partner with underground fungi must grow vast networks of fine, hair-like roots to search for phosphorus.", "This aggressive root expansion creates thousands of microscopic entry points for deadly soil pathogens."], "tags": ["SoilNutrients", "Pathogens", "RootSystems", "Phosphorus"]}, {"zone": "Understory + Soil", "title": "What are the underground networks actually doing?", "source": "NCBS Lab", "summary": "Researchers know mycorrhizal fungi connect plant roots across the forest floor — but exactly what they are trading and transporting remains largely unknown in tropical systems. The investigation is still underway.", "insights": ["Scientists use radioactive isotopes to physically track whether fungi are moving carbon, nitrogen, or phosphorus between different plants.", "Field experiments use specialised microscopic meshes in the soil — blocking harmful pathogens while still allowing helpful fungi through.", "Most of what we know about these networks comes from temperate forests; tropical fungal networks remain largely a mystery."], "tags": ["Mycorrhizae", "FungalNetworks", "SoilScience"]}, {"zone": "Understory + Soil", "title": "Do roots face the same fast-or-tough dilemma as leaves?", "source": "Shubham, NCBS", "summary": "Just like leaves, tree roots face a biological choice between rapid growth and defense. Roots that grow fast prioritise nutrient absorption; slow-growing roots invest in dense tissue to survive harsh conditions below ground.", "insights": ["Fast-growing species build roots with high nitrogen content to rapidly absorb soil nutrients.", "Slow-growing species build thick, high-density root tissue to defend against below-ground pests and pathogens."], "tags": ["RootTraits", "PlantDefense", "BelowGroundEcology"]}, {"zone": "Understory + Soil", "title": "Why do some roots grow thick while others branch out endlessly?", "source": "Shubham, NCBS", "summary": "Beyond fast or slow, roots use different structural strategies to gather nutrients. Some plants build vast networks of thin roots; others build thick roots that rely heavily on symbiotic fungi. Each comes with different enemies.", "insights": ["Thick roots have very high association with mycorrhizal fungi — up to 80-90% of plants use them. The fungi extend the root system and defend against pathogens.", "Thin roots branch out extensively but lack fungal shields — attracting more harmful soil pathogens as a result."], "tags": ["Mycorrhizae", "FungalSymbiosis", "RootArchitecture"]}, {"zone": "Understory + Soil", "title": "Can a tree be both fast-growing and fungi-dependent?", "source": "Shubham, NCBS", "summary": "A plant's growth speed and its reliance on fungi are completely independent strategies — they don't dictate each other. This creates multiple winning combinations for survival in the same patch of forest.", "insights": ["A fast-growing tree can use either highly branched thin roots or thick roots partnered with fungi.", "Because these traits are independent, forests can support a massive diversity of species, each exploiting a unique below-ground strategy."], "tags": ["EcologicalNiche", "Biodiversity", "SurvivalStrategies"]}, {"zone": "Signal", "title": "Why does chemical uniqueness determine whether a plant survives?", "source": "Rishiddh Jhaveri, NCBS", "summary": "A plant's survival heavily depends on its chemical uniqueness compared to its neighbours. If neighbouring plants share the exact same chemical makeup, specialist insects can easily wipe out the entire patch.", "insights": ["Plants deploy complex chemical cocktails — like phenolics — to deter specific herbivores.", "High chemical diversity in a local area acts as a collective, invisible shield for the whole plant community."], "tags": ["ChemicalDefense", "Herbivory", "Biochemistry"]}, {"zone": "Signal", "title": "What is the invisible dimension that separates species in a forest?", "source": "Sedio & Ostling (2013)", "summary": "Every plant species occupies a unique position in an invisible \"defence space\" defined by its chemical profile. How similar two species are in this space determines how many enemies they share — and how much they threaten each other.", "insights": ["Species that are chemically close share more enemies and compete more intensely for survival.", "Species on the outer edges of defence space — chemically unlike everything else — face the least enemy pressure from neighbours.", "Over generations, this pressure spreads species apart in chemical space, creating the chemical diversity we measure in GC-MS data."], "tags": ["DefenceSpace", "ChemicalDistance", "EnemyPressure", "Coexistence"]}, {"zone": "Signal", "title": "Do plants speak in a language with the same structure as human speech?", "source": "Zu et al. (2023) — JSE", "summary": "The same statistical pattern that governs word frequency in human language — a few words used constantly, most used rarely — also governs the distribution of volatile chemicals emitted by plants. The structure is uncannily similar.", "insights": ["A few VOCs dominate across many species. The majority are rare — highly specific chemical fingerprints.", "Plant chemical \"languages\" appear more redundant than human language, with steeper distribution curves.", "This structure reflects millions of years of co-evolutionary pressure between plants, pollinators, and herbivores — not randomness."], "tags": ["VOC", "ZipfsLaw", "ChemicalLanguage", "InformationTheory"]}, {"zone": "Signal", "title": "What does it mean that plants are trying to confuse insects — and insects are trying to see through it?", "source": "Zu et al. (2023) — JSE", "summary": "Plants and herbivores are locked in an ancient war of signals and counter-signals. The plant's goal: make its chemical profile as hard to decode as possible. The herbivore's goal: decode it faster than the plant can scramble it.", "insights": ["Plants maximise \"decoding uncertainty\" — flooding the chemical channel with noise, adding compounds shared across many species.", "Herbivores minimise decoding uncertainty — evolving to extract signal from noise and locate their host.", "Modelling this as an information game correctly predicts the VOC diversity patterns observed in real tropical forests."], "tags": ["InformationArmsRace", "ChemicalCommunication", "Coevolution", "VOC"]}, {"zone": "Signal", "title": "Should an insect chase a rare chemical signal or a common one?", "source": "Zu et al. (2023) — JSE", "summary": "Insects face a strategic choice when decoding the chemical forest: chase rare signals or common ones. Each has a trade-off between information gain and survival risk.", "insights": ["Rare VOCs carry more information per signal — they point precisely to one or few host species. But if that host disappears, the insect's entire strategy collapses.", "Common VOCs are safer to rely on but less informative — forcing the insect to decode more signals to find its host.", "This tension between rarity and reliability may be driving the specialisation patterns we see in herbivore communities."], "tags": ["SignalRarity", "InsectStrategy", "VOC", "Specialisation"]}, {"zone": "Philosophy", "title": "Why can't we see what's directly in front of us?", "source": "NCBS Lab", "summary": "Humans suffer from a well-documented cognitive bias called \"plant blindness.\" We are hardwired to notice charismatic animals but tend to blur all flora together into a generic, green background.", "insights": ["We instantly recognise the evolutionary difference between a tiger and a deer, but fail to see the vast ancient differences between two neighbouring trees.", "This visual bias makes it difficult to appreciate the complex, highly active survival strategies and chemical wars happening constantly in the plant kingdom."], "tags": ["PlantBlindness", "CognitiveBias", "Conservation"]}, {"zone": "Philosophy", "title": "What if a plant is not passive — what if it's always reading?", "source": "Brier (2008) — Peircean Biosemiotics", "summary": "The field of biosemiotics proposes that all living systems — including plants — are not passive matter but active interpreters of signs. A plant perceives its environment, responds to it, and acts on it through a continuous, unbroken stream of signification.", "insights": ["This extends communication far beyond language — pheromones, hormones, defensive chemicals, and electrical signals in roots all count as semiotic processes.", "Plants don't need a nervous system to be semiotic agents. The cell itself is the minimal unit of semiosis.", "Viewed this way, biodiversity loss is not just the disappearance of organisms — it is the collapse of a communication network that took hundreds of millions of years to build."], "tags": ["Biosemiotics", "Phytosemiotics", "PlantCommunication", "Semiosis"]}, {"zone": "Philosophy", "title": "Two species in the same forest. Are they in the same world?", "source": "Brier (2008) — Von Uexküll / Biosemiotics", "summary": "Every organism perceives only the slice of reality that is meaningful to its survival. This species-specific perceptual world is called the Umwelt. Two species standing in the same forest are, in a fundamental sense, in entirely different environments.", "insights": ["A tick's Umwelt is three signals: body warmth, sweat odour, and skin texture. The vast complexity of the forest is simply absent from its reality.", "A tree's Umwelt includes chemical gradients, fungal signals, root pressure, and light wavelengths — invisible to us, but its entire experienced world.", "Fragmentation doesn't just damage habitat. It destroys the Umwelt — the specific perceptual conditions each species needs to function, communicate, and survive."], "tags": ["Umwelt", "VonUexkull", "Perception", "SpeciesReality"]}, {"zone": "Philosophy", "title": "Does a plant know when it's being eaten?", "source": "Zu et al. / Brier", "summary": "Within seconds of insect attack, a plant's internal chemistry shifts. Defensive genes activate. Warning signals flood into the air. Neighbouring plants respond — upregulating their own defenses before the herbivore even reaches them. This is not metaphor. It is a communication system operating without a brain.", "insights": ["Herbivore-Induced Plant Volatiles (HIPVs) are released immediately upon leaf damage — a chemical alarm that travels through the canopy.", "Undamaged neighbouring plants \"eavesdrop\" on these signals and preemptively alter their own chemistry to become less palatable.", "Calling this \"communication\" is not anthropomorphism — it satisfies the information-theoretic definition: sender, signal, receiver, changed behaviour."], "tags": ["PlantAgency", "HIPV", "Eavesdropping", "Phytosemiotics"]}, {"zone": "Philosophy", "title": "Are we inside the disaster, or outside it?", "source": "Timothy Morton — Dark Ecology", "summary": "Dark ecology challenges the idea that nature is \"out there\" and humans are observers. The tea plantation and the forest fragment it surrounds are not opposites — they are one continuous managed system shaped by the same economic forces. There is no outside.", "insights": ["The boundary between the tea estate and the forest is not a line between civilization and wilderness — it is a line within a single, jointly managed landscape.", "The same capital extraction logic that planted the tea also fragmented the forest and weakened the CNDD that holds it together.", "To walk into the installation is to enter the disaster from within it — not as observer, but as participant."], "tags": ["DarkEcology", "Complicity", "Anthropocene", "TimothyMorton"]}, {"zone": "Philosophy", "title": "Can something be too large to perceive?", "source": "Timothy Morton — Hyperobjects", "summary": "Habitat fragmentation is what philosopher Timothy Morton calls a \"hyperobject\" — so vast in time and space that no single human can perceive it directly. You can measure a plot, a season, a species. But the fragmentation itself is everywhere and nowhere, always exceeding your grasp.", "insights": ["You can walk the edge of a fragment. You cannot walk the edge of fragmentation itself — it spans centuries, continents, and causal chains too tangled to trace.", "This is why the installation exists: not to explain fragmentation, but to make you feel the scale of something that resists direct perception.", "Every sensor reading, every seedling record, every VOC peak in the chromatogram is a partial, local trace of this hyperobject — never the whole thing."], "tags": ["Hyperobject", "DarkEcology", "Scale", "Perception"]}, {"zone": "Misc", "title": "Why did tree diversity increase as we climbed higher — when it shouldn't?", "source": "Shubham, NCBS", "summary": "When studying tree and fungal diversity up a mountain gradient in Kerala, the data defied ecological expectations. Instead of diversity dropping as the climate cooled at higher elevations, tree species richness actually increased.", "insights": ["Normally, warmer lower elevations support more tree and fungal species.", "Past logging at lower elevations had installed pioneer species — temporarily masking the true ancient diversity that remains untouched at higher elevations.", "Human intervention had inverted the expected pattern — a reminder that no ecological dataset can be read without its history."], "tags": ["ElevationGradient", "ForestLogging", "SpeciesRichness"]}, {"zone": "Misc", "title": "What happens when the variable you weren't watching turns out to matter most?", "source": "Meghna Krishnadas", "summary": "Soil nutrients were initially measured at Kadamane just to account for them in statistical models — not because anyone expected them to be a primary driver. The data revealed otherwise.", "insights": ["Because measuring every micro-environmental condition is impossible, researchers rely on past literature to select which variables to track.", "Nutrient gradients appeared in the data as a significant — and newly discovered — driver of ecosystem dynamics.", "Good field science requires measuring things you don't yet know you need."], "tags": ["FieldMethods", "DataModeling", "SoilNutrients"]}, {"zone": "Misc", "title": "How do you prove something across evolutionary time? You simulate it.", "source": "Levi & Terborgh (2019) — PNAS", "summary": "To prove that enemy pressure alone could sustain forest diversity across evolutionary timescales, researchers simulated 200 billion tree deaths — roughly 40 trillion tree-years of forest time — using high-performance computing.", "insights": ["Without exclusion zones: neutral drift drove all species toward monodominance, exactly as predicted.", "With even a minimal exclusion zone: diversity stabilised and held — for over 10 quadrillion simulated iterations.", "The finding reframes diversity not as a puzzle to be explained, but as a self-sustaining state maintained by invisible, local regulation."], "tags": ["Simulation", "NeutralTheory", "EcologicalDrift"]}, {"zone": "Time", "title": "What does it take to truly understand one forest?", "source": "NCBS Lab", "summary": "To understand how a forest changes over decades, researchers don't just look at a few trees — they map massive, 50-hectare plots. They measure, tag, and track the exact location and girth of hundreds of thousands of individual trees.", "insights": ["This effort reveals the hidden architecture of the forest — exactly which species naturally cluster together and which avoid each other.", "By returning to exact plots year after year, scientists can calculate precise mortality and growth rates, revealing how climate change and droughts alter the forest in real time."], "tags": ["ForestGeo", "TreeCensus", "LongTermMonitoring"]}, {"zone": "Time", "title": "When does the forest reveal who actually survives?", "source": "Vincy, NCBS", "summary": "Soil moisture plays a critical role in seedling survival — but its true, life-or-death impact is only visible during the harshest time of year: the dry season. This is when the forest filters.", "insights": ["From November to March, the monsoon rains vanish and the forest dries out.", "During this bottleneck, microscopic variations in how much moisture the soil can hold strictly dictate which seedlings will survive to see the rain return."], "tags": ["SoilMoisture", "DrySeason", "ClimateFactors"]}, {"zone": "Time", "title": "How do you track a forest changing over years?", "source": "Athulya, NCBS", "summary": "Tracking forest regeneration requires strict, long-term monitoring across shifting seasons. Researchers conduct bi-annual censuses — right before and right after the monsoon — using methods that scale precisely with the age of the plant.", "insights": ["Tiny seedlings are measured by height alone. Older saplings have their girth measured at exactly 30cm above the ground.", "Data loggers placed mid-plot continuously record temperature and humidity through the entire dry season.", "The full monitoring effort began in November 2021 — illustrating the time scale required to gather reliable baseline ecological data."], "tags": ["ForestCensus", "PlantGrowth", "FieldResearch"]}, {"zone": "Time", "title": "How do you study roots without destroying them?", "source": "Shubham, NCBS", "summary": "Studying delicate root systems requires meticulous lab work. Researchers use specialised underwater scanners to analyse the length, thickness, and structure of seedling roots without destroying them.", "insights": ["Seedling roots are extremely fragile and dry out very quickly once pulled from the soil.", "Roots are floated in water trays so they naturally separate, then scanned using high-resolution imaging systems."], "tags": ["FieldMethods", "RootScanning", "EcologyLab"]}, {"zone": "Time", "title": "Why do you need a thousand data points to ask one question?", "source": "Meghna Krishnadas", "summary": "To measure subtle micro-environmental changes accurately, researchers must set up a massive number of test plots — not because the forest is unruly, but because so many overlapping variables exist that only scale can separate signal from noise.", "insights": ["Local topography, wind patterns, and slope can each drastically alter local environmental conditions — making localised readings unreliable.", "With up to a thousand plots, researchers can find reliable overarching data patterns rather than localised anomalies."], "tags": ["FieldResearch", "DataCollection", "Topography", "Scale"]}];
+
+// ─── Zone-based placement strategy ───
+// The forest has a geography. Edge cards cluster near the boundary,
+// Philosophy cards sit at the deepest point, Understory cards hug the ground, etc.
+// Positions are deterministic (seeded) so layout is reproducible.
+// NOTE: rMin/rMax are fractions of the placement radius. Values were reduced
+// to pull cards closer to spawn so the user doesn't have to fly far to find them.
+const ZONE_PLACEMENT = {
+  'Edge':              { rMin: 0.45, rMax: 0.70, yMin: 1.6, yMax: 2.4 },
+  'Interior':          { rMin: 0.15, rMax: 0.40, yMin: 1.7, yMax: 2.5 },
+  'Understory + Soil': { rMin: 0.18, rMax: 0.55, yMin: 0.7, yMax: 1.3 },
+  'Signal':            { rMin: 0.20, rMax: 0.50, yMin: 2.0, yMax: 3.0 },
+  'Philosophy':        { rMin: 0.00, rMax: 0.30, yMin: 1.6, yMax: 2.8, forceFar: true },
+  'Time':              { rMin: 0.25, rMax: 0.55, yMin: 1.5, yMax: 2.4 },
+  'Misc':              { rMin: 0.25, rMax: 0.45, yMin: 1.6, yMax: 2.4 }
+};
+
+const RAW_NODES = (function generateCardNodes(){
+  const B = CONFIG.boundary;
+  const T = CONFIG.toolkit;
+  const placementR = B.radius - T.edgeMargin;
+  const out = [];
+
+  // Place each card according to its zone
+  CARD_DATA.forEach((card, i) => {
+    const zone = ZONE_PLACEMENT[card.zone] || ZONE_PLACEMENT['Misc'];
+    let x, z, y, ok = false;
+    let attempts = 0;
+    while(!ok && attempts < 200){
+      attempts++;
+      // Radial distance within zone band
+      const rFrac = zone.rMin + seedRnd() * (zone.rMax - zone.rMin);
+      const r = rFrac * placementR;
+      let ang = seedRnd() * Math.PI * 2;
+      // Philosophy: force placement in the "far" half (deeper z)
+      if(zone.forceFar){
+        ang = Math.PI * 0.5 + (seedRnd() - 0.5) * Math.PI * 0.9;
+      }
+      x = B.centerX + Math.cos(ang) * r;
+      z = B.centerZ + Math.sin(ang) * r;
+      // Avoid crowding the bug spawn
+      if(z > CAM_START - T.startMargin) continue;
+      // Min spacing from other cards
+      let spaced = true;
+      for(const n of out){
+        const dx = x - n.x, dz = z - n.z;
+        if(dx*dx + dz*dz < T.minSpacing*T.minSpacing){ spaced = false; break; }
+      }
+      if(!spaced) continue;
+      // Y height within zone band
+      y = zone.yMin + seedRnd() * (zone.yMax - zone.yMin);
+      ok = true;
+    }
+    // Fallback if placement failed (shouldn't happen with reasonable params)
+    if(!ok){
+      const ang = seedRnd() * Math.PI * 2;
+      const r = placementR * 0.5;
+      x = B.centerX + Math.cos(ang) * r;
+      z = B.centerZ + Math.sin(ang) * r;
+      y = 2.0;
+    }
+    out.push({
+      id: 'c' + String(i+1).padStart(2,'0'),
+      x, z, y,
+      type: 'toolkit',
+      zone: card.zone,
+      title: card.title,
+      source: card.source,
+      summary: card.summary,
+      insights: card.insights,
+      tags: card.tags
+    });
+  });
+  return out;
+})();
+
+// Build 3D node objects
+nodeMeshes=[];
+nodeObjects=[];
+
+const QMARK_TEX = makeQMarkTex();
+
+RAW_NODES.forEach((nd,i)=>{
+  // Question-mark SPRITE — always faces camera correctly, never reversed
+  const sm = new THREE.SpriteMaterial({
+    map: QMARK_TEX,
+    transparent: true,
+    depthWrite: false,
+    opacity: 0
+  });
+  const sprite = new THREE.Sprite(sm);
+  sprite.scale.set(1.7, 1.7, 1.7); // larger for better visibility (was 1.1)
+
+  // Faint floor halo (flat on ground) — locatable from above, not reversible
+  const haloGeo = new THREE.PlaneGeometry(2.2, 2.2);
+  const haloMat = new THREE.MeshBasicMaterial({
+    map: QMARK_TEX,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    opacity: 0
+  });
+  const halo = new THREE.Mesh(haloGeo, haloMat);
+  halo.rotation.x = -Math.PI/2;
+  halo.position.set(nd.x, 0.04, nd.z);
+
+  // Use the y assigned by zone-based placement
+  const y = (typeof nd.y === 'number') ? nd.y : (1.5 + Math.sin(i * 1.37) * 0.35);
+  sprite.position.set(nd.x, y, nd.z);
+  sprite.userData = {...nd, baseY: y, idx: i};
+
+  scene.add(sprite);
+  scene.add(halo);
+
+  nodeMeshes.push(sprite);
+  nodeObjects.push({
+    sprite, halo, light: null,
+    data: nd, baseY: y,
+    phase: Math.random() * Math.PI * 2,
+    visible: false
+  });
+});
+
+// Movement driven by keyboard — see keydown/keyup listeners above
+
+// ═══════════════════════════════════════════════
+// PROCEDURAL TILE SYSTEM — infinite forest generation
+// Each tile covers TILE_SIZE units of Z depth.
+// Tile index 0 = z: 18 to (18-TILE_SIZE), tile 1 = next, etc.
+// ═══════════════════════════════════════════════
+tileMeshes=new Map();
+builtTiles=new Set();
+lastTileIdx=-999;
+
+// ── Tile-aware versions of tree/sapling/mushroom factories ──
+
+
+// Pre-build tiles 0–5 at startup — covers stream zone and beyond with no gap
+for(let i=0;i<=5;i++){
+  builtTiles.add(i);
+  spawnTile(i);
+}
+
+// ── NUDGE CARDS AWAY FROM TREES ──
+// Zone-based placement runs before trees exist, so some cards end up inside
+// trunks. After trees are built, check each card against ALL_TRUNKS and
+// push it radially outward to a clear spot if it overlaps.
+nodeObjects.forEach(no => {
+  const nd = no.data;
+  const CARD_CLEARANCE = 1.2; // min distance from trunk edge
+  let attempts = 0;
+  let moved = false;
+  while(attempts < 12){
+    attempts++;
+    let inTree = null;
+    let inTreeDist = 0;
+    for(const tr of ALL_TRUNKS){
+      const dx = nd.x - tr.x;
+      const dz = nd.z - tr.z;
+      const d = Math.sqrt(dx*dx + dz*dz);
+      const minClear = tr.r + CARD_CLEARANCE;
+      if(d < minClear){
+        inTree = tr;
+        inTreeDist = d;
+        break;
+      }
+    }
+    if(!inTree) break; // card is clear
+    // Push card radially away from trunk center to just outside clearance
+    const dx = nd.x - inTree.x;
+    const dz = nd.z - inTree.z;
+    const d = inTreeDist || 0.001;
+    const nx = dx/d, nz = dz/d;
+    const pushDist = (inTree.r + CARD_CLEARANCE) - d + 0.1;
+    nd.x += nx * pushDist;
+    nd.z += nz * pushDist;
+    moved = true;
+  }
+  // If moved, update the sprite/halo positions too
+  if(moved){
+    no.sprite.position.x = nd.x;
+    no.sprite.position.z = nd.z;
+    no.halo.position.x = nd.x;
+    no.halo.position.z = nd.z;
+  }
+});
+} // end buildScene
+
+
+// ═══════════════════════════════════════════════
+// RAYCASTER
+// ═══════════════════════════════════════════════
+raycaster=new THREE.Raycaster();
+mouse2=new THREE.Vector2();
+document.addEventListener('mousemove',e=>{
+  mouse2.x=(e.clientX/W())*2-1;
+  mouse2.y=-(e.clientY/H())*2+1;
+});
+
+hoveredNode=null;
+
+// Click anywhere on the canvas to try opening the card under the cursor.
+// This is a fallback in case auto-hover doesn't trigger for some reason.
+document.getElementById('c').addEventListener('click', e => {
+  if(!appStarted) return;
+  // Don't steal clicks that land on the panel or credits modal
+  if(panelEl.classList.contains('open')) return;
+  if(document.getElementById('credits-modal').classList.contains('open')) return;
+
+  mouse2.x=(e.clientX/W())*2-1;
+  mouse2.y=-(e.clientY/H())*2+1;
+  raycaster.setFromCamera(mouse2, camera);
+  const hits = raycaster.intersectObjects(nodeMeshes, false);
+  if(hits.length > 0){
+    const sprite = hits[0].object;
+    const data = sprite.userData;
+    if(data && data.id){
+      insAtNode = null; // cancel any auto-hover
+      openPanel(data);
+    }
+  }
+});
+
+// ═══════════════════════════════════════════════
+// ANIMATION
+// ═══════════════════════════════════════════════
+let t=0;
+let frameCount=0;
+let panelOpen=false;
+let zoneShownEdge=false;      // shown when bug first starts moving
+let zoneShownInterior=false;  // shown at 35% depth progress
+let zoneShowUntil=0;          // frame to hide zone label at
+
+// Show the zone overlay with a given name for 4 seconds
+function showZoneLabel(name){
+  document.getElementById('zl-name').textContent = name;
+  document.getElementById('zone-label').classList.add('show');
+  zoneShowUntil = frameCount + 240; // 4 seconds
+}
+
+function animate(){
+  requestAnimationFrame(animate);
+  t+=.010;
+  frameCount++;
+
+  // ── CURSOR RING ──
+  rx+=(mx-rx)*.18; ry+=(my-ry)*.18;
+  cur2El.style.left=rx+'px'; cur2El.style.top=ry+'px';
+
+  if(!appStarted) return; // no 3D render until begin is clicked
+
+  // ── KEYBOARD → INSECT MOVEMENT ──
+  const SPEED=0.06, LATERAL=0.05, GRAV=0.012, LIFT=0.07;
+  const fwd  = keys['ArrowUp']   || keys['KeyW'];
+  const back = keys['ArrowDown'] || keys['KeyS'];
+  const left = keys['ArrowLeft'] || keys['KeyA'];
+  const right= keys['ArrowRight']|| keys['KeyD'];
+  const up   = keys['Space'];
+
+  if(!insAtNode){
+    // Build LOCAL input vector (in bug's own frame: forward = -Z local)
+    let lVX = 0, lVZ = 0;
+    if(fwd)   lVZ -= SPEED;
+    if(back)  lVZ += SPEED*0.6;
+    if(left)  lVX -= LATERAL;
+    if(right) lVX += LATERAL;
+    // Rotate local input by current heading → world-space velocity delta
+    // This makes W/S/A/D relative to where the bug is *facing*, not to world axes.
+    const h = insHeading;
+    const ch = Math.cos(h), sh = Math.sin(h);
+    insVX += ch*lVX + sh*lVZ;
+    insVZ += -sh*lVX + ch*lVZ;
+    if(up) insVY += LIFT;
+  }
+
+  // Gravity pulls insect down; floor at y=0.5
+  insVY-=GRAV;
+  insY+=insVY;
+  if(insY<0.5){ insY=0.5; insVY=0; }
+
+  // Friction
+  insVX*=0.80;
+  insVZ*=0.84;
+  insVY*=0.88;
+
+  // Snap tiny velocities to zero — kills camera jitter when bug is "stationary"
+  const eps = CONFIG.move.velStopEps;
+  if(Math.abs(insVX) < eps) insVX = 0;
+  if(Math.abs(insVZ) < eps) insVZ = 0;
+  if(Math.abs(insVY) < eps && insY <= 0.5 + 0.01) insVY = 0;
+
+  insX+=insVX;
+  insZ+=insVZ;
+
+  // ── TREE COLLISION ──
+  // Push the bug out of any trunk it intersects. Cheap: only check trunks
+  // within a small bounding box around the bug. Bug radius ≈ 0.25.
+  {
+    const BUG_R = 0.28;
+    const CHECK_R2 = 16; // 4 units squared — only check nearby trees
+    for(const tr of ALL_TRUNKS){
+      const dx = insX - tr.x;
+      const dz = insZ - tr.z;
+      const d2 = dx*dx + dz*dz;
+      if(d2 > CHECK_R2) continue;
+      const minD = tr.r + BUG_R;
+      if(d2 < minD*minD){
+        const d = Math.sqrt(d2) || 0.0001;
+        // Push bug radially outward so it sits just outside the trunk
+        const nx = dx/d, nz = dz/d;
+        insX = tr.x + nx * minD;
+        insZ = tr.z + nz * minD;
+        // Kill inward velocity component so it doesn't keep pressing into the tree
+        const vDotN = insVX*nx + insVZ*nz;
+        if(vDotN < 0){
+          insVX -= vDotN * nx;
+          insVZ -= vDotN * nz;
+        }
+      }
+    }
+  }
+
+  // ── TREE OCCLUSION (translucent fade) ──
+  // For each trunk near the line from camera to bug, fade it translucent.
+  // Uses point-to-line-segment distance. Runs every 3 frames to save cost.
+  if((frameCount % 3) === 0) {
+    const camX = camera.position.x, camY = camera.position.y, camZ2 = camera.position.z;
+    const bx = insX, by = insY, bz = insZ;
+    const segLenSq = (bx-camX)*(bx-camX) + (bz-camZ2)*(bz-camZ2);
+    for(const tr of ALL_TRUNKS){
+      // Only consider trunks in a corridor of interest around the bug
+      const near = (tr.x-insX)*(tr.x-insX) + (tr.z-insZ)*(tr.z-insZ);
+      if(near > 900){ // >30 units away — never affects view
+        if(tr.targetOpacity !== 1.0) tr.targetOpacity = 1.0;
+        continue;
+      }
+      // Project trunk (x,z) onto the camera→bug segment in XZ plane
+      let tPar = 0;
+      if(segLenSq > 0.001){
+        tPar = ((tr.x-camX)*(bx-camX) + (tr.z-camZ2)*(bz-camZ2)) / segLenSq;
+      }
+      // Only fade trunks that are BETWEEN camera and bug (not behind camera or past bug)
+      if(tPar > 0.05 && tPar < 0.95){
+        const projX = camX + (bx-camX) * tPar;
+        const projZ = camZ2 + (bz-camZ2) * tPar;
+        const pd = Math.sqrt((tr.x-projX)*(tr.x-projX) + (tr.z-projZ)*(tr.z-projZ));
+        // Fade if closer to the sightline than trunk radius + small margin
+        if(pd < tr.r + 0.8){
+          tr.targetOpacity = 0.25;
+        } else {
+          tr.targetOpacity = 1.0;
+        }
+      } else {
+        tr.targetOpacity = 1.0;
+      }
+    }
+  }
+  // Smooth-lerp trunk opacities every frame (cheap)
+  for(const tr of ALL_TRUNKS){
+    const cur = tr.trunkMat.opacity;
+    const tgt = tr.targetOpacity;
+    if(Math.abs(cur - tgt) > 0.01){
+      tr.trunkMat.opacity = cur + (tgt - cur) * 0.12;
+    }
+  }
+
+  // ── BOUNDARY: invisible soft inward push (no hard clamp, no visual warning) ──
+  // The forest is deep and continuous. Players should feel resistance but never
+  // see a "wall" or lose the ability to move freely in all directions.
+  {
+    const B = CONFIG.boundary;
+    const dxB = insX - B.centerX;
+    const dzB = insZ - B.centerZ;
+    const distB = Math.sqrt(dxB*dxB + dzB*dzB);
+    if(distB > B.radius){
+      const overshoot = distB - B.radius;
+      const nx = dxB / distB, nz = dzB / distB;
+      // Gentle inward force that scales with overshoot.
+      // No position clamp — player can still move freely; velocity corrects over time.
+      insVX -= nx * B.bounceK * (1 + overshoot * 0.4);
+      insVZ -= nz * B.bounceK * (1 + overshoot * 0.4);
+    }
+  }
+
+  // Update depth tracking
+  totalWalked=Math.max(0,CAM_START-insZ);
+  dfFixed=Math.min(1, totalWalked/CONFIG.move.depthDivisor);
+  document.getElementById('depth-fill').style.width=Math.min(100,dfFixed*100)+'%';
+
+  // ── ZONE LABEL: two markers only ──
+  //   "Edge of the Forest"      → when the bug first starts moving
+  //   "Interior of the Forest"  → at 35% depth progress
+  if(!zoneShownEdge && totalWalked > 2.5){
+    zoneShownEdge = true;
+    showZoneLabel('Edge of the Forest');
+  }
+  if(!zoneShownInterior && dfFixed >= 0.35){
+    zoneShownInterior = true;
+    showZoneLabel('Interior of the Forest');
+  }
+  // Auto-hide label after its timeout
+  if(zoneShowUntil && frameCount > zoneShowUntil){
+    document.getElementById('zone-label').classList.remove('show');
+    zoneShowUntil = 0;
+  }
+
+  // ── TILING (keyed off insZ) ──
+  const camZ=insZ;
+
+  // ── INSECT VISUAL ANIMATION ──
+  insBobPhase+=0.42;
+  // Minimal visual bob — was 0.03+0.012, now 0.008+0.003. Wings still flap.
+  const wingBob=Math.sin(insBobPhase)*0.008+Math.sin(insBobPhase*2.1)*0.003;
+  const insYDisplay=insY+wingBob;
+
+  // Heading: point bug in direction of actual motion.
+  // atan2(-vx, -vz) accounts for three.js rotation semantics: rotation.y=h
+  // rotates the default-forward (-Z) vector to (-sin h, 0, -cos h). So for
+  // motion direction V, we need -sin(h)=Vx/|V|, -cos(h)=Vz/|V|
+  // → h = atan2(-Vx, -Vz).
+  const speed2 = Math.sqrt(insVX*insVX + insVZ*insVZ);
+  if(speed2 > 0.005){
+    const targetHeading = Math.atan2(-insVX, -insVZ);
+    let delta = targetHeading - insHeading;
+    while(delta >  Math.PI) delta -= Math.PI*2;
+    while(delta < -Math.PI) delta += Math.PI*2;
+    insHeading += delta * 0.05; // slower yaw - smoother camera swing
+  }
+
+  const wingFlap=Math.sin(insBobPhase)*0.22;
+  insectGroup.position.set(insX, insYDisplay, insZ);
+  insectGroup.rotation.y=insHeading;
+  insectGroup.rotation.z=-insVX*3.5;    // bank: right = roll right
+  insectGroup.rotation.x=insVZ*2.0;     // pitch nose down when going forward
+  insectGroup.children.forEach((c,i)=>{
+    if(i>=5&&i<=8) c.rotation.z=c.rotation.z>0
+      ? 0.28+wingFlap : -0.28-wingFlap;
+  });
+
+  // ── NODE PROXIMITY — insect auto-hovers ──
+  if(!insAtNode){
+    const dR = CONFIG.move.detectR;
+    for(const no of nodeObjects){
+      const nd=no.data;
+      // Skip cards still in cooldown (prevents instant re-latch loop)
+      const lastOpened = nodeCooldown.get(nd.id);
+      if(lastOpened !== undefined && (frameCount - lastOpened) < NODE_COOLDOWN_FRAMES){
+        continue;
+      }
+      const dx=insX-nd.x, dz=insZ-nd.z;
+      const dy=insY-no.baseY;
+      // Wider Y tolerance: cards now placed at y=0.7–3.0 depending on zone,
+      // and bug flies anywhere from y=0.5 (floor) upward. 2.8 covers worst case.
+      if(Math.sqrt(dx*dx+dz*dz)<dR && Math.abs(dy)<2.8){
+        insAtNode=no; insNodeHoverT=0; break;
+      }
+    }
+  }
+  if(insAtNode){
+    insNodeHoverT++;
+    const nd=insAtNode.data;
+    // KEY: zero velocity while latched. Otherwise gravity accumulates insVY
+    // every frame and fights the Y magnet, causing a tiny perpetual bounce.
+    insVX = 0; insVY = 0; insVZ = 0;
+    // Stronger lerp (0.15 was 0.05) so bug settles faster and then holds still
+    insX+=(nd.x - insX)*0.15;
+    insY+=(insAtNode.baseY+0.2-insY)*0.15;
+    insZ+=(nd.z-insZ)*0.15;
+    // Use >= so a dropped frame never skips the trigger.
+    // activePanelId guard avoids re-opening while panel is still animating.
+    if(insNodeHoverT>=30 && activePanelId!==nd.id){
+      nodeCooldown.set(nd.id, frameCount);
+      openPanel(nd);
+    }
+    // Auto-release timeout — bigger nudge away so the bug actually exits
+    // the detection radius before cooldown expires.
+    if(insNodeHoverT>220){
+      const nd=insAtNode.data;
+      const awayX = (insX - nd.x);
+      const awayZ = (insZ - nd.z) || 0.5;
+      const aLen = Math.sqrt(awayX*awayX + awayZ*awayZ) || 1;
+      insVX = (awayX/aLen) * 0.12;
+      insVZ = (awayZ/aLen) * 0.12;
+      insAtNode=null;
+    }
+  }
+
+  // ── THIRD-PERSON CAMERA — follows bug heading ──
+  // With heading h, bug's forward F(h) = (-sin h, 0, -cos h).
+  // Camera sits BEHIND bug (opposite of F) and looks AHEAD (along F).
+  const cH = insHeading;
+  const backDist = 5.0;
+  const aheadDist = 2.0;
+  const camTargetX = insX + Math.sin(cH) * backDist;   // back = (+sin h, 0, +cos h)
+  const camTargetY = insY + 1.6;
+  const camTargetZ = insZ + Math.cos(cH) * backDist;
+  const cL = CONFIG.move.camLerp;
+  camera.position.x+=(camTargetX-camera.position.x)*cL;
+  camera.position.y+=(camTargetY-camera.position.y)*cL;
+  camera.position.z+=(camTargetZ-camera.position.z)*cL;
+  // Look AHEAD of bug in its facing direction
+  const lookX = insX - Math.sin(cH) * aheadDist;       // ahead = (-sin h, 0, -cos h)
+  const lookZ = insZ - Math.cos(cH) * aheadDist;
+  camera.lookAt(lookX, insY+0.1, lookZ);
+
+  // ── SKY & LIGHTING based on depth ──
+  // df goes 0→1 but we cap the visual darkness at 0.72 so colours stay visible
+  const df=dfFixed;
+  const darkDf=Math.min(df, 0.72); // lighting never goes beyond this
+  // Sky: bright blue-green at edge → deep forest green (not black)
+  const skyR=.53-darkDf*.35, skyG=.81-darkDf*.42, skyB=.67-darkDf*.32;
+  scene.background.setRGB(skyR,skyG,skyB);
+  scene.fog.color.setRGB(skyR*.85,skyG*.85,skyB*.85);
+  // Fog density caps — thick but not opaque wall
+  scene.fog.density=.016+darkDf*.038;
+
+  sunLight.intensity=Math.max(.55, 2.2-darkDf*1.6);
+  skyLight.intensity=Math.max(.35, 1.0-darkDf*.58);
+  ambLight.intensity=.25+darkDf*.55;
+
+  // God rays fade as we go deeper
+  godRays.forEach((gr,i)=>{
+    gr.material.opacity=Math.max(0,.045-df*.045+Math.sin(t*.4+i)*.009);
+  });
+
+  // Dapples fade
+  dappleMat.opacity=Math.max(0,.7-df*.7);
+
+  // Dust fades
+  dustMat.opacity=Math.max(0,.5-df*.5);
+  const dp=dust.geometry.attributes.position;
+  for(let i=0;i<120;i++){
+    const ph=dustPhase[i]+t*.2;
+    dp.setX(i, dp.getX(i)+Math.sin(ph)*.002);
+    dp.setY(i, dp.getY(i)+.001);
+    if(dp.getY(i)>6){dp.setY(i,.4);}
+  }
+  dp.needsUpdate=true;
+
+  // Spores rise
+  const sp2=spores.geometry.attributes.position;
+  for(let i=0;i<300;i++){
+    sp2.setY(i, sp2.getY(i)+.0014);
+    if(sp2.getY(i)>8){sp2.setY(i,.3);}
+  }
+  sp2.needsUpdate=true;
+  sporeMat.opacity=Math.max(0,df*.45);
+
+  // ── STREAM ANIMATION ──
+  const streamDist=Math.abs(camZ-STREAM_Z);
+  const streamFade=Math.max(0,1-streamDist/45);
+  if(streamFade>0){
+    // Undulate water surface
+    const wp=waterMesh.geometry.attributes.position;
+    for(let i=0;i<waterVertCount;i++){
+      const ox=waterOrigY[i];
+      const px=wp.getX?wp.getX(i):0;
+      wp.setY(i, Math.sin(t*2.8+i*.35)*.018+Math.cos(t*1.9+i*.52)*.012);
+    }
+    wp.needsUpdate=true;
+    waterMesh.geometry.computeVertexNormals();
+    // shimmer pulses
+    shimMesh.material.opacity=(.08+Math.sin(t*2.5)*.04)*streamFade;
+    shim2Mesh.material.opacity=(.05+Math.sin(t*3.8+1.2)*.03)*streamFade;
+    // Flow particles — move along X (downstream)
+    const fp=flowPoints.geometry.attributes.position;
+    for(let i=0;i<flowCount;i++){
+      let nx=fp.getX(i)+.04; // flow direction
+      if(nx>STREAM_W) nx=-STREAM_W;
+      fp.setX(i,nx);
+      fp.setZ(i, fp.getZ(i)+Math.sin(flowPhase[i]+t*.5)*.003);
+    }
+    fp.needsUpdate=true;
+    flowMat.opacity=(.65+Math.sin(t*1.2)*.1)*streamFade;
+    // Ripple particles scale
+    rippleMat.opacity=(.5+Math.sin(t*.8)*.1)*streamFade;
+  } else {
+    shimMesh.material.opacity=0;
+    shim2Mesh.material.opacity=0;
+    flowMat.opacity=0;
+    rippleMat.opacity=0;
+  }
+
+  // ── NODE VISIBILITY based on insect Z ──
+  nodeObjects.forEach((no,i)=>{
+    const nd=no.data;
+    const ahead=insZ-nd.z;
+    // Visible from farther away so bug can find cards from a distance
+    const inRange=ahead>-12 && ahead<45;
+    const targetOp=inRange ? Math.max(0,Math.min(1,(ahead+12)/15)) : 0;
+
+    const curOp=no.sprite.material.opacity;
+    const newOp=curOp+(targetOp-curOp)*.08;
+    // Boost base opacity so cards read clearly against fog
+    no.sprite.material.opacity=Math.min(1, newOp * 1.2);
+    no.halo.material.opacity=newOp*.55;
+
+    // MINIMAL bob — barely perceptible (was 0.12, now 0.03)
+    const bobY=no.baseY+Math.sin(no.phase+t*.5)*.03;
+    no.sprite.position.y=bobY;
+
+    // MINIMAL scale pulse (was 6%, now 1.5%)
+    const pulse=1+Math.sin(no.phase+t*.9)*0.015;
+
+    // Brighten + slight grow when insect is near (was 1.4×, now 1.15×)
+    const dx=insX-nd.x, dz=insZ-nd.z;
+    const distToInsect=Math.sqrt(dx*dx+dz*dz);
+    if(distToInsect<3 && newOp>.1){
+      no.sprite.material.opacity=Math.min(1,newOp*1.45);
+      no.sprite.scale.setScalar(pulse*1.15);
+      no.halo.material.opacity=Math.min(1,newOp*.9);
+    } else {
+      no.sprite.scale.setScalar(pulse);
+    }
+  });
+
+  renderer.render(scene,camera);
+}
+animate();
+
+// ═══════════════════════════════════════════════
+// ENTER
+// ═══════════════════════════════════════════════
+function startWalk(){
+  const intro=document.getElementById('intro');
+  const loading=document.getElementById('loading');
+  const bar=document.getElementById('ld-bar');
+
+  // 1. Hide intro, show loading screen — browser paints this before anything else
+  intro.classList.add('gone');
+  loading.classList.add('show');
+
+  // 2. Yield two frames so the loading screen actually renders before heavy JS
+  let yieldFrames=0;
+  function afterPaint(){
+    yieldFrames++;
+    if(yieldFrames<2){ requestAnimationFrame(afterPaint); return; }
+
+    // 3. Now build all scene geometry — loading screen is already visible
+    buildScene();
+
+    // 4. Animate bar while GPU warms up (shader compilation)
+    let pct=0;
+    const barInterval=setInterval(()=>{
+      pct=Math.min(95, pct+5);
+      bar.style.width=pct+'%';
+    },30);
+
+    let warmFrames=0;
+    function warmUp(){
+      renderer.render(scene,camera);
+      warmFrames++;
+      if(warmFrames<16){
+        requestAnimationFrame(warmUp);
+      } else {
+        clearInterval(barInterval);
+        bar.style.width='100%';
+        setTimeout(()=>{
+          loading.classList.add('fade');
+          setTimeout(()=>{
+            loading.style.display='none';
+            intro.style.display='none';
+            appStarted=true;
+          },420);
+        },120);
+      }
+    }
+    requestAnimationFrame(warmUp);
+  }
+  requestAnimationFrame(afterPaint);
+}
+
+window.addEventListener('resize',()=>{
+  camera.aspect=W()/H();
+  camera.updateProjectionMatrix();
+  renderer.setSize(W(),H());
+});
+
+// ═══════════════════════════════════════════════
+// PANEL
+// ═══════════════════════════════════════════════
+const panelEl=document.getElementById('panel');
+let activePanelId=null;
+
+function closePanel(){
+  panelEl.classList.remove('open');
+  activePanelId=null;
+  // Release insect with a nudge strong enough to exit the detection radius
+  // before the cooldown expires. Direction: back toward the camera.
+  if(insAtNode){
+    const nd = insAtNode.data;
+    const awayX = (insX - nd.x);
+    const awayZ = (insZ - nd.z) || 0.5;
+    const aLen = Math.sqrt(awayX*awayX + awayZ*awayZ) || 1;
+    insVX = (awayX/aLen) * 0.12;
+    insVZ = (awayZ/aLen) * 0.12;
+    // Ensure cooldown is recorded even if user closes very fast
+    nodeCooldown.set(nd.id, frameCount);
+    insAtNode=null;
+  }
+}
+
+// ── Credits modal ──
+function openCredits(){
+  document.getElementById('credits-modal').classList.add('open');
+}
+function closeCredits(){
+  document.getElementById('credits-modal').classList.remove('open');
+}
+// Close on Escape key or clicking the backdrop
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape') closeCredits();
+});
+document.getElementById('credits-modal').addEventListener('click',e=>{
+  if(e.target.id==='credits-modal') closeCredits();
+});
+
+function openPanel(nd){
+  if(activePanelId===nd.id){return;} // already open — don't toggle
+  activePanelId=nd.id;
+
+  // Hide the legacy badge/title/plot block — cards have their own layout
+  document.getElementById('p-badge').style.display='none';
+  document.getElementById('p-title').style.display='none';
+  document.getElementById('p-plot').style.display='none';
+
+  // Build insights as bullet list
+  const insightsHtml = (nd.insights && nd.insights.length)
+    ? `<ul class="tk-insights">${nd.insights.map(s=>`<li>${s}</li>`).join('')}</ul>`
+    : '';
+
+  // Source line
+  const sourceHtml = nd.source
+    ? `<div class="tk-source"><span class="tk-source-lbl">via</span> ${nd.source}</div>`
+    : '';
+
+  document.getElementById('p-body').innerHTML = `
+    <div class="tk-card" id="tkcard-${nd.id}">
+      <div class="tk-inner">
+        <div class="tk-front">
+          <div class="tk-headline">${nd.title}</div>
+          <div class="tap-indicator"><span>▼ Tap to reveal ▼</span></div>
+        </div>
+        <div class="tk-back">
+          <div class="tk-zone-badge tk-zone-badge-back">${(nd.zone||'').toUpperCase()} · ${nd.id.toUpperCase()}</div>
+          <div class="tk-back-headline">${nd.title}</div>
+          <div class="tk-back-body">${nd.summary||''}</div>
+          ${insightsHtml}
+          ${sourceHtml}
+          <div class="tk-flip-back-btn" onclick="event.stopPropagation();document.getElementById('tkcard-${nd.id}').classList.remove('flipped')">↶ Flip back</div>
+        </div>
+      </div>
+    </div>`;
+
+  // Bind click on front face → flip
+  const card = document.getElementById('tkcard-'+nd.id);
+  card.addEventListener('click', function(e){
+    if(card.classList.contains('flipped')) return;
+    card.classList.add('flipped');
+  });
+
+  panelEl.classList.add('open');
+}
+
+function buildBody(nd){
+  const t=nd.type;
+
+  if(t==='observation') return `
+    <div class="cndd">
+      <div class="cndd-lbl">↯ Kadumane · CNDD Study</div>
+      <div class="cndd-body">Seedlings near adult <strong>conspecifics</strong> face elevated mortality — 
+      Janzen-Connell dynamics shape species coexistence in this <strong>fragmented landscape</strong>.</div>
+    </div>
+    <div class="ntags">
+      ${(nd.tags||['Fragmented forest','CNDD','Seedling census']).map(s=>`<span class="ntag">${s}</span>`).join('')}
+    </div>
+    <p class="note-body">${nd.note||''}</p>`;
+
+  if(t==='photo') return `
+    <div class="photo-slot"><div class="ph-icon">◻</div>
+      <div class="ph-lbl">${nd.title}</div>
+      <div class="ph-upload">upload photo to populate</div></div>
+    <div class="photo-slot-sm">
+      <div class="photo-slot"><div class="ph-icon">◻</div>
+        <div class="ph-lbl">detail view</div></div>
+      <div class="photo-slot"><div class="ph-icon">◻</div>
+        <div class="ph-lbl">context shot</div></div>
+    </div>
+    <p class="note-body" style="margin-top:.8rem;font-size:.82rem">
+      <em>${nd.plot}</em> — upload photographs to this node to populate the visual record.</p>`;
+
+  if(t==='audio') return `<div id="audio-list-${nd.id}"></div>`;
+
+  if(t==='sketch') return `
+    <div class="sketch-frame">
+      <svg width="60" height="60" viewBox="0 0 60 60" fill="none" opacity=".2">
+        <circle cx="30" cy="30" r="28" stroke="#c8d890" stroke-width=".7" stroke-dasharray="4,3"/>
+        <line x1="30" y1="4" x2="30" y2="56" stroke="#c8d890" stroke-width=".5" stroke-dasharray="3,4"/>
+        <line x1="4" y1="30" x2="56" y2="30" stroke="#c8d890" stroke-width=".5" stroke-dasharray="3,4"/>
+        <circle cx="30" cy="30" r="5" stroke="#c8d890" stroke-width=".6" fill="none"/>
+      </svg>
+    </div>
+    <div class="sketch-lbl">${nd.title} — ${nd.plot}</div>
+    <p class="note-body" style="margin-top:.9rem;font-size:.82rem">
+      Upload a scanned sketch or hand-drawn diagram to attach it to this node.</p>`;
+
+  if(t==='data') return buildDataBody(nd);
+
+  if(t==='entry') return buildEntryBody();
+
+  return `<p class="note-body">${nd.note||''}</p>`;
+}
+
+function buildDataBody(nd){
+  if(nd.id==='n7') return `
+    <div class="d-stat-row">
+      <div class="d-stat"><div class="d-stat-n">26,754</div><div class="d-stat-l">Records</div></div>
+      <div class="d-stat"><div class="d-stat-n">252</div><div class="d-stat-l">Plots</div></div>
+      <div class="d-stat"><div class="d-stat-n">4</div><div class="d-stat-l">Seasons</div></div>
+    </div>
+    <div class="d-sec">Seedling Survival by Species</div>
+    ${[['BLAUMB',72,false],['DICGEL',84,false],['PSYNIG',55,true],
+       ['SYZRUB',38,true],['ELALAT',67,false],['ACACAE',48,true]]
+    .map(([s,p,lo],i)=>`
+      <div class="surv-row">
+        <span class="surv-lbl">${s}</span>
+        <div class="surv-track">
+          <div class="surv-bar" style="width:${p}%;--d:${i*.1}s;
+            background:linear-gradient(90deg,${lo?'rgba(200,120,80,.4),rgba(220,100,60,.8)':'rgba(160,200,120,.3),rgba(180,220,130,.8)'})"></div>
+        </div>
+        <span class="surv-pct">${p}%</span>
+      </div>`).join('')}
+    <div style="margin-top:1.3rem" class="d-sec">Dry-Season Soil Moisture</div>
+    <div style="display:flex;align-items:flex-end;gap:6px;height:44px;margin-bottom:.4rem">
+      ${[{y:"'22",h:14},{y:"'23",h:24},{y:"'24",h:42},{y:"'25",h:40}].map(b=>`
+        <div style="display:flex;flex-direction:column;align-items:center;gap:3px;flex:1">
+          <div style="width:100%;height:${b.h}px;background:linear-gradient(to top,rgba(180,200,140,.5),rgba(180,200,140,.12));border-radius:1px 1px 0 0"></div>
+          <span style="font-family:'Space Mono',monospace;font-size:.42rem;color:rgba(180,200,140,.3)">${b.y}</span>
+        </div>`).join('')}
+    </div>
+    <div class="d-sec" style="margin-top:1rem">Species</div>
+    <div class="sp-chips" id="spChips"></div>`;
+
+  if(nd.id==='n13') return `
+    <div class="d-sec">GC-MS Chemical Spectra — Memecylon randerianum</div>
+    <div class="spectra-wrap"><svg id="spectraSvg" width="100%" height="56" preserveAspectRatio="none" viewBox="0 0 700 56"></svg></div>
+    <p class="note-body" style="margin-top:.7rem;font-size:.82rem">
+      Peak area over retention time 0–32 min. Likely terpenoid fraction at <em>1.07–3.4 min</em>. 
+      15,560 data points across 15 species · Feb 2024 MK Lab run.</p>`;
+
+  return `<p class="note-body">Data record for ${nd.title}</p>`;
+}
+
+function buildEntryBody(){
+  return `
+    <div class="fgrid">
+      <div class="fld"><label>Plot ID</label><input type="text" placeholder="KDM_L1_P1"></div>
+      <div class="fld"><label>Subplot</label>
+        <select><option>Select</option><option>A</option><option>B</option><option>C</option><option>D</option></select></div>
+      <div class="fld"><label>Date</label><input type="date"></div>
+      <div class="fld"><label>Species</label><input type="text" placeholder="code or name"></div>
+      <div class="fld"><label>Distance conspecific (m)</label><input type="number" step=".1" placeholder="0.0"></div>
+      <div class="fld"><label>Height (cm)</label><input type="number" step=".5" placeholder="0.0"></div>
+    </div>
+    <div class="fld"><label>Notes</label>
+      <textarea placeholder="Morphology, damage, microhabitat, neighbours..."></textarea></div>
+    <div class="fgrid" style="margin-bottom:.7rem">
+      <div class="fld"><label>Type</label>
+        <select><option>Field observation</option><option>Mortality record</option>
+          <option>New recruit</option><option>Lab analysis</option></select></div>
+      <div class="fld"><label>Survival</label>
+        <select><option>Select</option><option>1 — Alive</option><option>0 — Dead</option><option>Missing</option></select></div>
+    </div>
+    <div class="fgrid" style="margin-bottom:.7rem">
+      <div class="up-zone"><input type="file" accept="image/*" multiple>
+        <div class="up-icon">⬡</div><div class="up-txt">Photos</div></div>
+      <div class="up-zone"><input type="file" accept="audio/*">
+        <div class="up-icon">◉</div><div class="up-txt">Audio</div></div>
+    </div>
+    <div class="up-zone"><input type="file" accept="image/*,.pdf">
+      <div class="up-icon">◈</div><div class="up-txt">Sketch / Drawing</div></div>
+    <button class="save-btn" onclick="this.textContent='✓ Saved';setTimeout(()=>this.textContent='Save to Record',2200)">Save to Record</button>`;
+}
+
+function postBuild(nd){
+  // audio
+  const audioList=document.getElementById('audio-list-'+nd.id);
+  if(audioList){
+    const recs=[
+      {n:'Field dictation — '+nd.plot,m:'upload to play'},
+      {n:'Ambient forest recording',m:'upload to play'},
+    ];
+    audioList.innerHTML=recs.map(r=>{
+      const bars=Array.from({length:20},()=>
+        `<div class="wb" style="height:${Math.random()*16+3}px"></div>`).join('');
+      return`<div class="aud">
+        <button class="aud-btn" onclick="this.textContent=this.textContent==='▶'?'⏸':'▶'">▶</button>
+        <div style="flex:1">
+          <div class="aud-name">${r.n}</div>
+          <div class="aud-meta">${r.m}</div>
+        </div>
+        <div class="wavebars">${bars}</div>
+      </div>`;
+    }).join('');
+  }
+
+  // spectra
+  const svgEl=document.getElementById('spectraSvg');
+  if(svgEl){
+    const peaks=[{t:1.1,h:8},{t:3.4,h:44},{t:5.2,h:14},
+      {t:7.8,h:52},{t:10.1,h:20},{t:13.5,h:12},{t:16.2,h:40},
+      {t:19.0,h:7},{t:22.4,h:56},{t:25.1,h:26},{t:28.7,h:16},{t:31.0,h:38}];
+    let pts='0,56';
+    peaks.forEach(p=>{const x=(p.t/32)*700;pts+=` ${x-3},56 ${x},${56-p.h} ${x+3},56`;});
+    pts+=' 700,56';
+    svgEl.innerHTML=`<defs><linearGradient id="spg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#a090d8" stop-opacity=".8"/>
+      <stop offset="100%" stop-color="#a090d8" stop-opacity=".05"/>
+    </linearGradient></defs>
+    <polygon points="${pts}" fill="url(#spg)" stroke="#a090d8" stroke-width="1" stroke-linejoin="round"/>`;
+  }
+
+  // species chips
+  const chips=document.getElementById('spChips');
+  if(chips){
+    const sp=['BLAUMB','DICGEL','PSYNIG','SYZRUB','ELALAT','ACACAE',
+      'Memecylon randerianum','Psychotria nigra','Syzygium rubicundum','Blachia umbellata'];
+    chips.innerHTML=sp.map(s=>`<span class="sp-chip">${s}</span>`).join('');
+  }
+}
+</script>
+</body>
+</html>
