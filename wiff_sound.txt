@@ -1,0 +1,176 @@
+# ───────────────── RAGA DEFINITIONS ─────────────────
+SA = 48  # root note C3
+$current_species = 0
+
+RAGAS = {
+  0 => {
+    name: "Bhairav",
+    notes: [0, 1, 4, 5, 7, 8, 11].map { |n| SA + n },
+    drone: [SA, SA + 7]
+  },
+  1 => {
+    name: "Yaman",
+    notes: [0, 2, 4, 6, 7, 9, 11].map { |n| SA + n },
+    drone: [SA, SA + 7]
+  },
+  2 => {
+    name: "Bhairavi",
+    notes: [0, 1, 3, 5, 7, 8, 10].map { |n| SA + n },
+    drone: [SA, SA - 5]
+  },
+  3 => {
+    name: "Bageshri",
+    notes: [0, 2, 3, 5, 7, 8, 10].map { |n| SA + n },
+    drone: [SA, SA + 5]
+  },
+  4 => {
+    name: "Megh Malhar",
+    notes: [0, 2, 5, 7, 10].map { |n| SA + n },
+    drone: [SA, SA + 7]
+  }
+}
+
+# ───────────────── DRONE ─────────────────
+live_loop :drone_low do
+  stop
+  use_real_time
+  raga = RAGAS[$current_species] || RAGAS[0]
+  synth :prophet,
+    note:    raga[:drone][0] - 12,
+    attack:  4,
+    sustain: 12,
+    release: 4,
+    amp:     0.6,
+    cutoff:  60,
+    res:     0.3
+  sleep 16
+end
+
+live_loop :drone_high do
+  stop
+  use_real_time
+  raga = RAGAS[$current_species] || RAGAS[0]
+  synth :prophet,
+    note:    raga[:drone][1],
+    attack:  6,
+    sustain: 10,
+    release: 4,
+    amp:     0.35,
+    cutoff:  70,
+    res:     0.2
+  sleep 16
+end
+
+live_loop :raga_melody do
+  stop
+  use_real_time
+  raga = RAGAS[$current_species] || RAGAS[0]
+  notes = raga[:notes]
+  play notes.choose,
+    amp:     rand * 0.3 + 0.1,
+    attack:  rand * 1.5 + 0.5,
+    release: rand * 2.0 + 1.0,
+    pan:     rrand(-0.4, 0.4),
+    cutoff:  rrand(65, 85),
+    synth:   :blade
+  sleep [1.5, 2, 2.5, 3].choose
+end
+
+
+# ───────────────── OSC: MATURE ─────────────────
+live_loop :osc_mature do
+  #stop
+  use_real_time
+  node_id, species = sync "/osc*/forest/mature"
+  puts "mature | node:#{node_id} species:#{species}"
+  
+  $current_species = species
+  raga = RAGAS[species] || RAGAS[0]
+  
+  # slow swelling chord from raga notes — feels like arrival
+  raga[:notes].each_slice(3) do |chord_notes|
+    chord_notes.each do |n|
+      synth :hollow,
+        note:    n,
+        amp:     0.4,
+        attack:  2.0,
+        sustain: 3.0,
+        release: 3.0,
+        cutoff:  90,
+        pan:     rrand(-0.5, 0.5)
+    end
+    sleep 4
+  end
+end
+
+# ───────────────── OSC: DEATH ─────────────────
+live_loop :osc_death do
+  use_real_time
+  node_id, species = sync "/osc*/forest/death"
+  puts "death  | node:#{node_id} species:#{species}"
+  
+  # deep thud
+  synth :bass_foundation,
+    note:    SA - 12,
+    amp:     1.2,
+    attack:  0.05,
+    sustain: 0.5,
+    release: 3.0,
+    cutoff:  60
+  
+  sleep 0.3
+  
+  # second lower thud — like a body falling
+  synth :bass_foundation,
+    note:    SA - 14,
+    amp:     0.8,
+    attack:  0.05,
+    sustain: 0.3,
+    release: 4.0,
+    cutoff:  50
+  
+  sleep 0.5
+  
+  # rumble tail
+  synth :dark_ambience,
+    note:    SA - 10,
+    amp:     0.5,
+    attack:  1.0,
+    release: 6.0,
+    cutoff:  45
+end
+
+# ───────────────── OSC: SEEDLING ─────────────────
+live_loop :osc_seedling do
+  use_real_time
+  node_id, s0, s1, s2, s3 = sync "/osc*/forest/seedling"
+  puts "seedling | node:#{node_id} competing:#{[s0,s1,s2,s3]}"
+  
+  competing = [s0, s1, s2, s3].uniq.compact
+  
+  # each species gets its own rhythmic thread with a different pulse
+  pulses = [0.25, 0.33, 0.5, 0.4]
+  
+  competing.each_with_index do |s, idx|
+    raga = RAGAS[s]
+    next if raga.nil?
+    pulse = pulses[idx % pulses.length]
+    
+    in_thread do
+      8.times do
+        play raga[:notes].choose,
+          synth:   :pluck,
+          amp:     rrand(0.3, 0.6),
+          attack:  0.01,
+          release: rrand(0.1, 0.3),
+          pan:     rrand(-0.7, 0.7),
+          cutoff:  rrand(80, 110),
+          decay:   0.1
+        sleep pulse
+      end
+    end
+    
+  end
+  
+  sleep 4  # let the polyrhythm play out before listening again
+end
