@@ -614,12 +614,7 @@ const nodeTip=document.getElementById('node-tip');
 const MATERIAL_POOLS={
   shrub:new Map(),
   fern:new Map(),
-  litter:new Map(),
-  roots:new Map(),
-  mushroom:new Map(),
-  rock:new Map(),
-  trunk:new Map(),
-  canopy:new Map()
+  litter:new Map()
 };
 const SAPLING_TEMPLATE_POOL=[];
 
@@ -634,7 +629,6 @@ function getSaplingTemplate(idx, sh, df){
   }
   return SAPLING_TEMPLATE_POOL[idx].clone(true);
 }
-function quant(v, step=0.05){ return Math.round(v/step)*step; }
 
 // ═══════════════════════════════════════════════
 // CURSOR
