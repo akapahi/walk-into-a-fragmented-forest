@@ -612,6 +612,11 @@ let nodeMeshes=[], nodeObjects=[];
 let raycaster, mouse2, hoveredNode=null;
 const nodeTip=document.getElementById('node-tip');
 const MATERIAL_POOLS={
+  trunk:new Map(),
+  canopy:new Map(),
+  roots:new Map(),
+  mushroom:new Map(),
+  rock:new Map(),
   shrub:new Map(),
   fern:new Map(),
   litter:new Map()
@@ -622,6 +627,9 @@ function getPooledMaterial(poolName, key, factory){
   const pool=MATERIAL_POOLS[poolName];
   if(!pool.has(key)) pool.set(key,factory());
   return pool.get(key);
+}
+function quant(value, step){
+  return (Math.round(value/step)*step).toFixed(4);
 }
 function getSaplingTemplate(idx, sh, df){
   if(!SAPLING_TEMPLATE_POOL[idx]){
