@@ -568,11 +568,16 @@ function srnd(a,b){return a+(b-a)*seedRnd();}
 // GLOBALS
 // ═══════════════════════════════════════════════
 const W=()=>window.innerWidth, H=()=>window.innerHeight;
-let appStarted=false;
 const CAM_START=18;
 const TILE_SIZE=80;
 let totalWalked=0;
 let dfFixed=0;
+const APP_STATE={
+  appStarted:false,
+  panelOpen:false,
+  creditsOpen:false,
+  hoveredNodeId:null
+};
 
 // ── INSECT STATE ──
 let insZ=CAM_START;
@@ -606,6 +611,24 @@ let tileMeshes, builtTiles, lastTileIdx;
 let nodeMeshes=[], nodeObjects=[];
 let raycaster, mouse2, hoveredNode=null;
 const nodeTip=document.getElementById('node-tip');
+const MATERIAL_POOLS={
+  shrub:new Map(),
+  fern:new Map(),
+  litter:new Map()
+};
+const SAPLING_TEMPLATE_POOL=[];
+
+function getPooledMaterial(poolName, key, factory){
+  const pool=MATERIAL_POOLS[poolName];
+  if(!pool.has(key)) pool.set(key,factory());
+  return pool.get(key);
+}
+function getSaplingTemplate(idx, sh, df){
+  if(!SAPLING_TEMPLATE_POOL[idx]){
+    SAPLING_TEMPLATE_POOL[idx]=makeLSapling(sh,df);
+  }
+  return SAPLING_TEMPLATE_POOL[idx].clone(true);
+}
 
 // ═══════════════════════════════════════════════
 // CURSOR
@@ -1213,9 +1236,9 @@ function spawnTile(idx){
     const x=rnd(-24,24);
     const z=rnd(zEnd+.5, zStart-.5);
     const sGeo=new THREE.SphereGeometry(rnd(.2,.6),6,4);
-    const sMat=new THREE.MeshLambertMaterial({
-      color:new THREE.Color(.03+Math.random()*.03,.06+Math.random()*.06,.01),
-      transparent:true,opacity:.85});
+    const sMat=getPooledMaterial('shrub',`tile_shrub_${Math.round(tileDf*4)}`,()=>new THREE.MeshLambertMaterial({
+      color:new THREE.Color(.04,.10-Math.min(tileDf*0.02,0.03),.02),
+      transparent:true,opacity:.85}));
     const sh=new THREE.Mesh(sGeo,sMat);
     sh.position.set(x,rnd(.1,.4),z);
     sh.scale.y=rnd(.4,.7);
@@ -1229,9 +1252,9 @@ function spawnTile(idx){
     const z=rnd(zEnd+.2, zStart-.2);
     const s=rnd(.2,.75);
     const fGeo=new THREE.PlaneGeometry(s,s);
-    const fMat=new THREE.MeshLambertMaterial({
-      color:new THREE.Color(.03+Math.random()*.04,.08+Math.random()*.07,.01),
-      side:THREE.DoubleSide,transparent:true,opacity:.85});
+    const fMat=getPooledMaterial('fern',`tile_fern_${Math.round(tileDf*4)}`,()=>new THREE.MeshLambertMaterial({
+      color:new THREE.Color(.04,.11-Math.min(tileDf*0.02,0.03),.02),
+      side:THREE.DoubleSide,transparent:true,opacity:.85}));
     const f=new THREE.Mesh(fGeo,fMat);
     f.position.set(x,.02,z);
     f.rotation.x=-Math.PI/2+(Math.random()-.5)*.5;
@@ -1245,9 +1268,9 @@ function spawnTile(idx){
     const x=rnd(-24,24);
     const z=rnd(zEnd+.1, zStart-.1);
     const lg=new THREE.PlaneGeometry(.3+Math.random()*.6,.3+Math.random()*.6);
-    const lm=new THREE.MeshLambertMaterial({
-      color:new THREE.Color(.10+Math.random()*.06,.14+Math.random()*.08,.03),
-      side:THREE.DoubleSide});
+    const lm=getPooledMaterial('litter','tile_litter',()=>new THREE.MeshLambertMaterial({
+      color:new THREE.Color(.14,.18,.04),
+      side:THREE.DoubleSide}));
     const lf=new THREE.Mesh(lg,lm);
     lf.rotation.x=-Math.PI/2+(Math.random()-.5)*.3;
     lf.rotation.z=Math.random()*Math.PI*2;
@@ -1330,7 +1353,8 @@ function makeTileTree(x,z,h,r,df){
   return g;
 }
 function makeTileSapling(x,z,sh,df){
-  const sg=makeLSapling(sh,df);
+  const poolIdx=Math.floor(srnd(0,10));
+  const sg=getSaplingTemplate(poolIdx,sh,df);
   sg.position.set(x,0,z); sg.rotation.y=Math.random()*Math.PI*2;
   scene.add(sg); return sg;
 }
@@ -1436,7 +1460,7 @@ for(let i=0;i<200;i++){
 for(let i=0;i<60;i++){
   const z=rnd(-8,-112); const df=depthFactor(z);
   const sh=rnd(.65,2.1);
-  const sg=makeLSapling(sh,df);
+  const sg=getSaplingTemplate(i%10,sh,df);
   sg.position.set(rnd(-20,20),0,z); sg.rotation.y=Math.random()*Math.PI*2;
   scene.add(sg);
 }
@@ -2052,7 +2076,7 @@ hoveredNode=null;
 // Click anywhere on the canvas to try opening the card under the cursor.
 // This is a fallback in case auto-hover doesn't trigger for some reason.
 document.getElementById('c').addEventListener('click', e => {
-  if(!appStarted) return;
+  if(!APP_STATE.appStarted) return;
   // Don't steal clicks that land on the panel or credits modal
   if(panelEl.classList.contains('open')) return;
   if(document.getElementById('credits-modal').classList.contains('open')) return;
@@ -2097,7 +2121,7 @@ function animate(){
   rx+=(mx-rx)*.18; ry+=(my-ry)*.18;
   cur2El.style.left=rx+'px'; cur2El.style.top=ry+'px';
 
-  if(!appStarted) return; // no 3D render until begin is clicked
+  if(!APP_STATE.appStarted) return; // no 3D render until begin is clicked
 
   // ── KEYBOARD → INSECT MOVEMENT ──
   const SPEED=0.06, LATERAL=0.05, GRAV=0.012, LIFT=0.07;
@@ -2510,7 +2534,7 @@ function startWalk(){
           setTimeout(()=>{
             loading.style.display='none';
             intro.style.display='none';
-            appStarted=true;
+            APP_STATE.appStarted=true;
           },420);
         },120);
       }
@@ -2534,6 +2558,7 @@ let activePanelId=null;
 
 function closePanel(){
   panelEl.classList.remove('open');
+  APP_STATE.panelOpen=false;
   activePanelId=null;
   // Release insect with a nudge strong enough to exit the detection radius
   // before the cooldown expires. Direction: back toward the camera.
@@ -2553,9 +2578,11 @@ function closePanel(){
 // ── Credits modal ──
 function openCredits(){
   document.getElementById('credits-modal').classList.add('open');
+  APP_STATE.creditsOpen=true;
 }
 function closeCredits(){
   document.getElementById('credits-modal').classList.remove('open');
+  APP_STATE.creditsOpen=false;
 }
 // Close on Escape key or clicking the backdrop
 document.addEventListener('keydown',e=>{
@@ -2610,6 +2637,7 @@ function openPanel(nd){
   });
 
   panelEl.classList.add('open');
+  APP_STATE.panelOpen=true;
 }
 
 function buildBody(nd){
