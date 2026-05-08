@@ -612,6 +612,11 @@ let nodeMeshes=[], nodeObjects=[];
 let raycaster, mouse2, hoveredNode=null;
 const nodeTip=document.getElementById('node-tip');
 const MATERIAL_POOLS={
+  trunk:new Map(),
+  canopy:new Map(),
+  roots:new Map(),
+  mushroom:new Map(),
+  rock:new Map(),
   shrub:new Map(),
   fern:new Map(),
   litter:new Map()
