@@ -623,6 +623,9 @@ function getPooledMaterial(poolName, key, factory){
   if(!pool.has(key)) pool.set(key,factory());
   return pool.get(key);
 }
+function quant(value, step){
+  return (Math.round(value/step)*step).toFixed(4);
+}
 function getSaplingTemplate(idx, sh, df){
   if(!SAPLING_TEMPLATE_POOL[idx]){
     SAPLING_TEMPLATE_POOL[idx]=makeLSapling(sh,df);
